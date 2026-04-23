@@ -1,0 +1,2 @@
+agency_id,agency_name,agency_url,agency_timezone,agency_lang
+JAGR_LABS,Jorge Gonzalez — Movilidad San Antonio (Prototipo),https://github.com/tu_usuario,America/Panama,es

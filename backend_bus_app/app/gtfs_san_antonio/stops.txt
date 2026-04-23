@@ -1,0 +1,29 @@
+stop_id,stop_name,stop_lat,stop_lon,location_type
+P01,Metro San Antonio R,9.0519492,-79.4446879,0
+P02,Entrada San Antonio,9.0531348,-79.4439996,0
+P03,Academia Bil. San Antonio,9.057056,-79.443589,0
+P04,Iglesia Bautista,9.058325,-79.442042,0
+P05,Saint Anthony School,9.059848,-79.440377,0
+P06,Parque San Antonio,9.061968,-79.438,0
+P07,Calle del Cedro,9.064217,-79.43837,0
+P08,Calle A las Begonias,9.0667975,-79.4389623,0
+P09,Calle de Las Margaritas,9.0686009,-79.4394342,0
+P10,Calle Verona Este,9.0720338,-79.442778,0
+P11,Calle Genova,9.0742979,-79.4429047,0
+P12,Calle Asis Este,9.0767751,-79.443343,0
+P13,Calle Asis Oeste,9.0756566,-79.4449233,0
+P14,Calle Turin,9.0740597,-79.4448775,0
+P15,Calle verona oeste,9.0720442,-79.4450765,0
+P16,Salida Camino Real,9.0707969,-79.4432095,0
+P17,Av. Urraca 2,9.0692564,-79.4428519,0
+P18,JCOM rufina alfaro,9.0660121,-79.4429009,0
+P19,Calle del Cerro,9.0641261,-79.4431115,0
+P20,Martin de enciso,9.0619219,-79.4448697,0
+P21,Martin de Enciso2,9.0619178,-79.4448693,0
+P22,Escuela pedro J.  Ameglio,9.059556,-79.4455646,0
+P23,Parada de san Antonio,9.0562003,-79.4456649,0
+P24,Torre C-R,9.0542801,-79.4447595,0
+P25,Metro San Antonio I,9.0520875,-79.4450039,0
+P26,Metro Cerro Viento,9.0509452,-79.4503618,0
+P27,Inicio,9.050627,-79.450221,0
+P28,Edificio Torre C-I,9.055242,-79.445061,0

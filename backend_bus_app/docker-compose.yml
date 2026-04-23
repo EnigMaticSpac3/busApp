@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app
+    env_file:
+      - .env                          # ← lee las variables desde .env
+    #depends_on:                      ← hasta usar crowdsourcing
+    #  db:
+    #    condition: service_healthy    # ← espera que Postgres esté LISTO, no solo iniciado
+
+  db:
+    image: postgis/postgis:15-3.3
+    env_file:
+      - .env                          # ← mismas variables, sin duplicar
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

@@ -1,0 +1,28 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+
+# Flutter platforms
+**/android/
+**/ios/
+**/linux/
+**/macos/
+**/windows/
+**/web/
+
+# IDEs
+.idea/
+.vscode/
+.claude/
+
+# Datos temporales o locales
+*.gpx
+!gtfs_san_antonio/*.txt  # Queremos ignorar GPX pero guardar el GTFS generado

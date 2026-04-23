@@ -1,0 +1,2 @@
+route_id,agency_id,route_short_name,route_long_name,route_type,route_color,route_text_color
+SA_INTERNAL,JAGR_LABS,SA1,Ruta Interna San Antonio — Enlace Metro,3,007BFF,FFFFFF
