@@ -1,12 +1,5 @@
 """
 main.py — San Antonio Bus Tracker API
-Correcciones aplicadas vs versión anterior:
-  1. asyncio.Lock para eliminar race condition en motor_gps
-  2. Velocidad calculada desde timestamps reales del GPX (Δdist/Δtime)
-  3. Filtro "ya pasamos" basado en metros reales, no índices arbitrarios
-  4. Manejo de errores con logging en lifespan
-  5. Credenciales leídas desde variables de entorno (.env)
-  
 Fuente de datos: carpeta GTFS local (no requiere importación manual a DB).
 La DB queda reservada para datos dinámicos (crowdsourcing, logs).
 """
@@ -16,15 +9,15 @@ import logging
 import math
 import os
 import csv
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from pydantic import BaseModel
-from typing import Optional
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -40,27 +33,32 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 load_dotenv()
 
-# Ruta a la carpeta GTFS — relativa a este archivo (main.py)
 GTFS_DIR = Path(__file__).parent / "gtfs_san_antonio"
-
-# IDs que usamos en nuestro feed GTFS
 SHAPE_ID = "SA_R1"
 TRIP_ID  = "SA_IDA_001"
+
+# Timeout en segundos — si no llega señal del contribuidor, el bus vuelve a simulación
+CONTRIBUIDOR_TIMEOUT_SEG = 15
+
+# Umbrales del map matching
+UMBRAL_DISTANCIA_RUTA_M  = 35.0
+UMBRAL_VELOCIDAD_MIN_MS  = 1.4
+UMBRAL_VELOCIDAD_MAX_MS  = 22.0
+UMBRAL_ASIGNACION_BUS_M  = 200.0
 
 # ---------------------------------------------------------------------------
 # Estado compartido en memoria
 # ---------------------------------------------------------------------------
-
-# Puntos del shape: lista de dicts con lat, lon, dist_acumulada
 ruta_puntos: list = []
-
-# Paradas: lista de dicts con stop_id, nombre, lat, lon, indice_ruta, dist_ruta
 paradas_info: list = []
 
 buses = [
-    {"id": "Bus-01", "indice": 0,    "lat": 0.0, "lon": 0.0, "vel_ms": 0.0},
-    {"id": "Bus-02", "indice": 500,  "lat": 0.0, "lon": 0.0, "vel_ms": 0.0},
-    {"id": "Bus-03", "indice": 1000, "lat": 0.0, "lon": 0.0, "vel_ms": 0.0},
+    {"id": "Bus-01", "indice": 0,    "lat": 0.0, "lon": 0.0, "vel_ms": 0.0,
+     "contribuidor_activo": False, "ultimo_contribucion": 0.0},
+    {"id": "Bus-02", "indice": 500,  "lat": 0.0, "lon": 0.0, "vel_ms": 0.0,
+     "contribuidor_activo": False, "ultimo_contribucion": 0.0},
+    {"id": "Bus-03", "indice": 1000, "lat": 0.0, "lon": 0.0, "vel_ms": 0.0,
+     "contribuidor_activo": False, "ultimo_contribucion": 0.0},
 ]
 
 _buses_lock = asyncio.Lock()
@@ -70,7 +68,6 @@ _buses_lock = asyncio.Lock()
 # ---------------------------------------------------------------------------
 
 def haversine(lat1, lon1, lat2, lon2) -> float:
-    """Distancia en metros entre dos coordenadas."""
     R = 6_371_000
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     a = (math.sin(math.radians(lat2 - lat1) / 2) ** 2
@@ -80,7 +77,6 @@ def haversine(lat1, lon1, lat2, lon2) -> float:
 
 
 def leer_csv_gtfs(nombre_archivo: str) -> list[dict]:
-    """Lee un archivo .txt del feed GTFS y devuelve lista de dicts."""
     ruta = GTFS_DIR / nombre_archivo
     if not ruta.exists():
         raise FileNotFoundError(f"Archivo GTFS no encontrado: {ruta}")
@@ -89,10 +85,6 @@ def leer_csv_gtfs(nombre_archivo: str) -> list[dict]:
 
 
 def gtfs_time_a_segundos(tiempo_str: str) -> int:
-    """
-    Convierte HH:MM:SS de GTFS a segundos totales.
-    GTFS permite horas > 23 para servicios de madrugada (ej: 25:00:00).
-    """
     h, m, s = tiempo_str.strip().split(":")
     return int(h) * 3600 + int(m) * 60 + int(s)
 
@@ -102,10 +94,6 @@ def gtfs_time_a_segundos(tiempo_str: str) -> int:
 # ---------------------------------------------------------------------------
 
 def cargar_ruta_desde_gtfs() -> list:
-    """
-    Lee shapes.txt y devuelve los puntos del shape SHAPE_ID
-    ordenados por secuencia, con distancia acumulada incluida.
-    """
     shapes = leer_csv_gtfs("shapes.txt")
     puntos = [
         {
@@ -124,11 +112,6 @@ def cargar_ruta_desde_gtfs() -> list:
 
 
 def cargar_paradas_desde_gtfs(ruta: list) -> list:
-    """
-    Lee stops.txt y stop_times.txt para el TRIP_ID definido.
-    Calcula el índice del punto de ruta más cercano a cada parada
-    usando shape_dist_traveled para el filtro 'ya pasamos'.
-    """
     stops_raw = leer_csv_gtfs("stops.txt")
     stops_dict = {
         row["stop_id"]: {
@@ -154,9 +137,6 @@ def cargar_paradas_desde_gtfs(ruta: list) -> list:
 
         stop = stops_dict[stop_id]
         dist_gtfs = float(row.get("shape_dist_traveled", 0))
-
-        # Buscamos el índice más cercano por distancia acumulada
-        # Es más preciso que buscar por coordenadas cuando el GPX tiene puntos densos
         indice_cercano = min(
             range(len(ruta)),
             key=lambda i: abs(ruta[i]["dist"] - dist_gtfs)
@@ -182,24 +162,43 @@ def cargar_paradas_desde_gtfs(ruta: list) -> list:
 
 async def motor_gps():
     """
-    Avanza cada bus un punto por tick bajo el lock para evitar race conditions.
-    La velocidad se calcula desde shape_dist_traveled (metros reales entre
-    puntos consecutivos) dividido entre el intervalo del tick (1 segundo).
+    Avanza cada bus un punto por tick.
+
+    FIX: Si el bus tiene un contribuidor activo cuya última señal llegó hace
+    menos de CONTRIBUIDOR_TIMEOUT_SEG segundos, el motor NO sobreescribe su
+    posición — respeta los datos reales del GPS del usuario.
+
+    Si el contribuidor deja de enviar señales (timeout), el bus vuelve
+    automáticamente a la simulación.
     """
     if not ruta_puntos:
         log.warning("motor_gps: ruta_puntos vacía, motor detenido.")
         return
 
     while True:
+        ahora = time.time()
         async with _buses_lock:
             for bus in buses:
+                # Verificar si el contribuidor sigue activo
+                if bus["contribuidor_activo"]:
+                    tiempo_sin_senal = ahora - bus["ultimo_contribucion"]
+                    if tiempo_sin_senal > CONTRIBUIDOR_TIMEOUT_SEG:
+                        # Timeout — volver a simulación
+                        bus["contribuidor_activo"] = False
+                        log.info(f"{bus['id']}: contribuidor perdido después de "
+                                 f"{tiempo_sin_senal:.0f}s, volviendo a simulación.")
+                    else:
+                        # Contribuidor activo — no sobreescribir su posición real
+                        continue
+
+                # Simulación normal
                 idx   = bus["indice"]
                 punto = ruta_puntos[idx]
 
                 vel_ms = 0.0
                 if idx > 0:
                     dist_delta = ruta_puntos[idx]["dist"] - ruta_puntos[idx - 1]["dist"]
-                    vel_ms = dist_delta / 1.0  # metros por segundo
+                    vel_ms = dist_delta / 1.0
 
                 bus["lat"]    = punto["lat"]
                 bus["lon"]    = punto["lon"]
@@ -303,125 +302,95 @@ async def get_parada_cercana(id_bus: str):
     return {"parada": "Fin de recorrido", "eta": "--", "distancia": 0}
 
 
-# Umbrales del map matching
-UMBRAL_DISTANCIA_RUTA_M  = 35.0   # metros — qué tan cerca debe estar de la ruta
-UMBRAL_VELOCIDAD_MIN_MS  = 1.4    # m/s — ~5 km/h mínimo para considerar que va en bus
-UMBRAL_VELOCIDAD_MAX_MS  = 22.0   # m/s — ~80 km/h máximo razonable para un bus urbano
-UMBRAL_ASIGNACION_BUS_M  = 200.0  # metros — distancia máxima al bus más cercano
- 
- 
+# ---------------------------------------------------------------------------
+# Crowdsourcing
+# ---------------------------------------------------------------------------
+
 class UbicacionUsuario(BaseModel):
-    """Payload que envía el celular del usuario contribuidor."""
-    usuario_id: str           # ID anónimo generado en el celular (UUID)
+    usuario_id: str
     lat: float
     lon: float
-    velocidad_ms: float       # velocidad reportada por el GPS del celular
-    precision_m: Optional[float] = None  # precisión GPS en metros (opcional)
- 
- 
+    velocidad_ms: float
+    precision_m: Optional[float] = None
+
+
 def map_matching(lat: float, lon: float, velocidad_ms: float) -> Optional[dict]:
-    """
-    Determina si el usuario está en un bus y cuál.
- 
-    Algoritmo:
-      1. ¿Está dentro de UMBRAL_DISTANCIA_RUTA_M metros de algún punto de la ruta?
-      2. ¿Su velocidad es coherente con un bus en movimiento?
-      3. ¿Qué bus de la flota simulada está más cerca?
- 
-    Devuelve el bus asignado o None si no cumple los criterios.
-    """
-    # Filtro 1: velocidad coherente con un bus
     if not (UMBRAL_VELOCIDAD_MIN_MS <= velocidad_ms <= UMBRAL_VELOCIDAD_MAX_MS):
         return None
- 
-    # Filtro 2: proximidad a la ruta — buscamos el punto más cercano
+
     dist_minima_ruta = float("inf")
     for punto in ruta_puntos:
         d = haversine(lat, lon, punto["lat"], punto["lon"])
         if d < dist_minima_ruta:
             dist_minima_ruta = d
- 
+
     if dist_minima_ruta > UMBRAL_DISTANCIA_RUTA_M:
         return None
- 
-    # Filtro 3: asignar al bus simulado más cercano
-    bus_asignado   = None
-    dist_min_bus   = float("inf")
- 
+
+    bus_asignado = None
+    dist_min_bus = float("inf")
     for bus in buses:
         if bus["lat"] == 0.0 and bus["lon"] == 0.0:
-            continue  # bus sin posición aún
+            continue
         d = haversine(lat, lon, bus["lat"], bus["lon"])
         if d < dist_min_bus:
             dist_min_bus = d
             bus_asignado = bus
- 
+
     if bus_asignado is None or dist_min_bus > UMBRAL_ASIGNACION_BUS_M:
         return None
- 
+
     return bus_asignado
- 
- 
+
+
 @app.post("/api/contribuir-ubicacion")
 async def contribuir_ubicacion(payload: UbicacionUsuario, debug: bool = False):
-    """
-    Recibe la ubicación GPS de un usuario contribuidor.
-    Corre el map matching para determinar si está en un bus
-    y en cuál, y actualiza su posición.
- 
-    Por ahora actualiza el bus simulado más cercano con la
-    posición real del usuario. Cuando haya múltiples contribuidores
-    en el mismo bus, se promediará la posición (fase 2).
-    """
-    # Validación básica de coordenadas
     if not (-90 <= payload.lat <= 90 and -180 <= payload.lon <= 180):
         return {"estado": "rechazado", "motivo": "coordenadas inválidas"}
- 
-    # Ignorar señales con precisión GPS muy baja (ej: >50m de error)
+
     if payload.precision_m is not None and payload.precision_m > 50:
         return {"estado": "rechazado", "motivo": "precisión GPS insuficiente"}
 
     if debug:
-        # En modo debug asignamos al bus más cercano sin filtros
         async with _buses_lock:
             bus_cercano = min(
                 (b for b in buses if b["lat"] != 0.0),
                 key=lambda b: haversine(payload.lat, payload.lon, b["lat"], b["lon"]),
                 default=None
             )
-        if bus_cercano:
-            return {"estado": "aceptado", "bus_id": bus_cercano["id"]}
-        return {"estado": "ignorado", "motivo": "sin buses activos"}
- 
+            if bus_cercano:
+                bus_cercano["lat"]                 = payload.lat
+                bus_cercano["lon"]                 = payload.lon
+                bus_cercano["vel_ms"]              = payload.velocidad_ms
+                bus_cercano["contribuidor_activo"] = True
+                bus_cercano["ultimo_contribucion"] = time.time()
+                bus_id = bus_cercano["id"]
+            else:
+                return {"estado": "ignorado", "motivo": "sin buses activos"}
+
+        log.info(f"[DEBUG] Contribución aceptada: usuario={payload.usuario_id} → {bus_id}")
+        return {"estado": "aceptado", "bus_id": bus_id}
+
+    # Modo normal — map matching completo
     bus = map_matching(payload.lat, payload.lon, payload.velocidad_ms)
- 
+
     if bus is None:
         return {
-            "estado":  "ignorado",
-            "motivo":  "no se detectó bus cercano o velocidad fuera de rango",
-            "lat":     payload.lat,
-            "lon":     payload.lon,
-            "vel_ms":  payload.velocidad_ms,
+            "estado": "ignorado",
+            "motivo": "no se detectó bus cercano o velocidad fuera de rango",
         }
- 
-    # Actualizar posición del bus con la ubicación real del contribuidor
+
     async with _buses_lock:
         for b in buses:
             if b["id"] == bus["id"]:
-                b["lat"]    = payload.lat
-                b["lon"]    = payload.lon
-                b["vel_ms"] = payload.velocidad_ms
+                b["lat"]                 = payload.lat
+                b["lon"]                 = payload.lon
+                b["vel_ms"]              = payload.velocidad_ms
+                b["contribuidor_activo"] = True
+                b["ultimo_contribucion"] = time.time()
                 break
- 
-    log.info(
-        f"Contribución aceptada: usuario={payload.usuario_id} "
-        f"→ {bus['id']} ({payload.lat:.5f}, {payload.lon:.5f}) "
-        f"vel={payload.velocidad_ms:.1f} m/s"
-    )
- 
-    return {
-        "estado":    "aceptado",
-        "bus_id":    bus["id"],
-        "lat":       payload.lat,
-        "lon":       payload.lon,
-    }
+
+    log.info(f"Contribución aceptada: usuario={payload.usuario_id} → {bus['id']} "
+             f"({payload.lat:.5f}, {payload.lon:.5f}) vel={payload.velocidad_ms:.1f} m/s")
+
+    return {"estado": "aceptado", "bus_id": bus["id"]}
