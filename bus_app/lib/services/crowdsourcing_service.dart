@@ -125,7 +125,8 @@ class CrowdsourcingService extends ChangeNotifier {
 
       final response = await http
           .post(
-            Uri.parse('${AppConfig.backendUrl}/api/contribuir-ubicacion'),
+            Uri.parse('${AppConfig.backendUrl}/api/contribuir-ubicacion'
+            '${AppConfig.debugCrowdsourcing ? "?debug=true" : ""}'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode(payload.toJson()),
           )
