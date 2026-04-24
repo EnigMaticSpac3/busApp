@@ -23,6 +23,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from pydantic import BaseModel
+from typing import Optional
+
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
@@ -298,3 +301,127 @@ async def get_parada_cercana(id_bus: str):
         }
 
     return {"parada": "Fin de recorrido", "eta": "--", "distancia": 0}
+
+
+# Umbrales del map matching
+UMBRAL_DISTANCIA_RUTA_M  = 35.0   # metros — qué tan cerca debe estar de la ruta
+UMBRAL_VELOCIDAD_MIN_MS  = 1.4    # m/s — ~5 km/h mínimo para considerar que va en bus
+UMBRAL_VELOCIDAD_MAX_MS  = 22.0   # m/s — ~80 km/h máximo razonable para un bus urbano
+UMBRAL_ASIGNACION_BUS_M  = 200.0  # metros — distancia máxima al bus más cercano
+ 
+ 
+class UbicacionUsuario(BaseModel):
+    """Payload que envía el celular del usuario contribuidor."""
+    usuario_id: str           # ID anónimo generado en el celular (UUID)
+    lat: float
+    lon: float
+    velocidad_ms: float       # velocidad reportada por el GPS del celular
+    precision_m: Optional[float] = None  # precisión GPS en metros (opcional)
+ 
+ 
+def map_matching(lat: float, lon: float, velocidad_ms: float) -> Optional[dict]:
+    """
+    Determina si el usuario está en un bus y cuál.
+ 
+    Algoritmo:
+      1. ¿Está dentro de UMBRAL_DISTANCIA_RUTA_M metros de algún punto de la ruta?
+      2. ¿Su velocidad es coherente con un bus en movimiento?
+      3. ¿Qué bus de la flota simulada está más cerca?
+ 
+    Devuelve el bus asignado o None si no cumple los criterios.
+    """
+    # Filtro 1: velocidad coherente con un bus
+    if not (UMBRAL_VELOCIDAD_MIN_MS <= velocidad_ms <= UMBRAL_VELOCIDAD_MAX_MS):
+        return None
+ 
+    # Filtro 2: proximidad a la ruta — buscamos el punto más cercano
+    dist_minima_ruta = float("inf")
+    for punto in ruta_puntos:
+        d = haversine(lat, lon, punto["lat"], punto["lon"])
+        if d < dist_minima_ruta:
+            dist_minima_ruta = d
+ 
+    if dist_minima_ruta > UMBRAL_DISTANCIA_RUTA_M:
+        return None
+ 
+    # Filtro 3: asignar al bus simulado más cercano
+    bus_asignado   = None
+    dist_min_bus   = float("inf")
+ 
+    for bus in buses:
+        if bus["lat"] == 0.0 and bus["lon"] == 0.0:
+            continue  # bus sin posición aún
+        d = haversine(lat, lon, bus["lat"], bus["lon"])
+        if d < dist_min_bus:
+            dist_min_bus = d
+            bus_asignado = bus
+ 
+    if bus_asignado is None or dist_min_bus > UMBRAL_ASIGNACION_BUS_M:
+        return None
+ 
+    return bus_asignado
+ 
+ 
+@app.post("/api/contribuir-ubicacion")
+async def contribuir_ubicacion(payload: UbicacionUsuario, debug: bool = False):
+    """
+    Recibe la ubicación GPS de un usuario contribuidor.
+    Corre el map matching para determinar si está en un bus
+    y en cuál, y actualiza su posición.
+ 
+    Por ahora actualiza el bus simulado más cercano con la
+    posición real del usuario. Cuando haya múltiples contribuidores
+    en el mismo bus, se promediará la posición (fase 2).
+    """
+    # Validación básica de coordenadas
+    if not (-90 <= payload.lat <= 90 and -180 <= payload.lon <= 180):
+        return {"estado": "rechazado", "motivo": "coordenadas inválidas"}
+ 
+    # Ignorar señales con precisión GPS muy baja (ej: >50m de error)
+    if payload.precision_m is not None and payload.precision_m > 50:
+        return {"estado": "rechazado", "motivo": "precisión GPS insuficiente"}
+
+    if debug:
+        # En modo debug asignamos al bus más cercano sin filtros
+        async with _buses_lock:
+            bus_cercano = min(
+                (b for b in buses if b["lat"] != 0.0),
+                key=lambda b: haversine(payload.lat, payload.lon, b["lat"], b["lon"]),
+                default=None
+            )
+        if bus_cercano:
+            return {"estado": "aceptado", "bus_id": bus_cercano["id"]}
+        return {"estado": "ignorado", "motivo": "sin buses activos"}
+ 
+    bus = map_matching(payload.lat, payload.lon, payload.velocidad_ms)
+ 
+    if bus is None:
+        return {
+            "estado":  "ignorado",
+            "motivo":  "no se detectó bus cercano o velocidad fuera de rango",
+            "lat":     payload.lat,
+            "lon":     payload.lon,
+            "vel_ms":  payload.velocidad_ms,
+        }
+ 
+    # Actualizar posición del bus con la ubicación real del contribuidor
+    async with _buses_lock:
+        for b in buses:
+            if b["id"] == bus["id"]:
+                b["lat"]    = payload.lat
+                b["lon"]    = payload.lon
+                b["vel_ms"] = payload.velocidad_ms
+                break
+ 
+    log.info(
+        f"Contribución aceptada: usuario={payload.usuario_id} "
+        f"→ {bus['id']} ({payload.lat:.5f}, {payload.lon:.5f}) "
+        f"vel={payload.velocidad_ms:.1f} m/s"
+    )
+ 
+    return {
+        "estado":    "aceptado",
+        "bus_id":    bus["id"],
+        "lat":       payload.lat,
+        "lon":       payload.lon,
+    }
