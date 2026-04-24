@@ -14,4 +14,8 @@ class AppConfig {
 
   // Umbral mínimo de distancia (metros) para considerar que el bus llegó a una parada
   static const double umbraMetrosParada = 30.0;
+
+  // ⚠️ Modo debug: bypasea el map matching en el backend para pruebas en casa.
+  // Cambia a false antes de hacer el commit final / producción.
+  static const bool debugCrowdsourcing = true;
 }
