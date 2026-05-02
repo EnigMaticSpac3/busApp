@@ -1,20 +1,29 @@
 services:
   api:
     build: .
+    container_name: bus_tracker_api
     ports:
       - "8000:8000"
-    volumes:
-      - ./app:/app
     env_file:
-      - .env                          # ← lee las variables desde .env
-    #depends_on:                      ← hasta usar crowdsourcing
-    #  db:
-    #    condition: service_healthy    # ← espera que Postgres esté LISTO, no solo iniciado
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/ruta"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   db:
     image: postgis/postgis:15-3.3
+    container_name: bus_tracker_db
     env_file:
-      - .env                          # ← mismas variables, sin duplicar
+      - .env
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -23,11 +32,19 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend_network
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
+
+networks:
+  backend_network:
+    driver: bridge
 
 volumes:
   pgdata:

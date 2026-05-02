@@ -143,7 +143,7 @@ class _MapScreenState extends State<MapScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('San Antonio Bus Tracker'),
-        backgroundColor: Colors.blueAccent,
+        backgroundColor: const Color(0xFF283C90),
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -165,7 +165,7 @@ class _MapScreenState extends State<MapScreen> {
 
     return FloatingActionButton.extended(
       onPressed: _toggleContribucion,
-      backgroundColor: activo ? Colors.green : Colors.blueAccent,
+      backgroundColor: activo ? const Color(0xFFC8D527) : const Color(0xFF283C90),
       icon: Icon(activo ? Icons.location_on : Icons.location_off),
       label: Text(
         activo
@@ -214,7 +214,7 @@ class _MapScreenState extends State<MapScreen> {
           polylines: [
             Polyline(
               points: _routePoints,
-              color: Colors.blue.withOpacity(0.6),
+              color: const Color(0xFFC8D527).withOpacity(0.6),
               strokeWidth: 4,
             ),
           ],

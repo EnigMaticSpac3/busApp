@@ -46,7 +46,7 @@ class EtaBanner extends StatelessWidget {
   Color get _colorFondo {
     if (cargando || eta == null) return Colors.grey.shade300;
     if (eta!.esFinDeRecorrido) return Colors.orange.shade200;
-    return Colors.amber.shade300;
+    return const Color(0xFFE88D67);
   }
 
   IconData get _icono {

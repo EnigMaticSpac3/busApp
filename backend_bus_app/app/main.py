@@ -306,7 +306,7 @@ async def get_parada_cercana(id_bus: str):
 # Umbrales del map matching
 UMBRAL_DISTANCIA_RUTA_M  = 35.0   # metros — qué tan cerca debe estar de la ruta
 UMBRAL_VELOCIDAD_MIN_MS  = 1.4    # m/s — ~5 km/h mínimo para considerar que va en bus
-UMBRAL_VELOCIDAD_MAX_MS  = 22.0   # m/s — ~80 km/h máximo razonable para un bus urbano
+UMBRAL_VELOCIDAD_MAX_MS  = 16.0   # m/s — ~60 km/h máximo razonable para un bus urbano
 UMBRAL_ASIGNACION_BUS_M  = 200.0  # metros — distancia máxima al bus más cercano
  
  
@@ -319,17 +319,22 @@ class UbicacionUsuario(BaseModel):
     precision_m: Optional[float] = None  # precisión GPS en metros (opcional)
  
  
-def map_matching(lat: float, lon: float, velocidad_ms: float) -> Optional[dict]:
+def map_matching(lat: float, lon: float, velocidad_ms: float, precision_m: Optional[float] = None) -> Optional[dict]:
     """
     Determina si el usuario está en un bus y cuál.
- 
+  
     Algoritmo:
-      1. ¿Está dentro de UMBRAL_DISTANCIA_RUTA_M metros de algún punto de la ruta?
-      2. ¿Su velocidad es coherente con un bus en movimiento?
-      3. ¿Qué bus de la flota simulada está más cerca?
- 
+      1. ¿La precisión GPS es aceptable? (rechazar si > 50m)
+      2. ¿Está dentro de UMBRAL_DISTANCIA_RUTA_M metros de algún punto de la ruta?
+      3. ¿Su velocidad es coherente con un bus en movimiento?
+      4. ¿Qué bus de la flota simulada está más cerca?
+  
     Devuelve el bus asignado o None si no cumple los criterios.
     """
+    # Filtro 0: precisión GPS suficiente
+    if precision_m is not None and precision_m > 50:
+        return None
+
     # Filtro 1: velocidad coherente con un bus
     if not (UMBRAL_VELOCIDAD_MIN_MS <= velocidad_ms <= UMBRAL_VELOCIDAD_MAX_MS):
         return None
@@ -393,7 +398,7 @@ async def contribuir_ubicacion(payload: UbicacionUsuario, debug: bool = False):
             return {"estado": "aceptado", "bus_id": bus_cercano["id"]}
         return {"estado": "ignorado", "motivo": "sin buses activos"}
  
-    bus = map_matching(payload.lat, payload.lon, payload.velocidad_ms)
+    bus = map_matching(payload.lat, payload.lon, payload.velocidad_ms, payload.precision_m)
  
     if bus is None:
         return {
