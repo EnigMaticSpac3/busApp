@@ -55,7 +55,12 @@ services:
 - No hay volumen para GTFS (se copia en build, no actualizable en runtime)
 - PostGIS corre pero NO se usa en código
 
-## 🔧 Quick Wins Activos
+## ✅ Quick Wins Completados
+- ~~Multi-stage Dockerfile~~ - Implementado, imagen ~150MB
+- ~~.dockerignore~~ - Creado
+- ~~docker-compose.yml optimizado~~ - Red, healthchecks, restart
+
+## 🔧 Quick Wins Activos (pendientes)
 
 ### 1. Multi-stage Dockerfile
 ```dockerfile

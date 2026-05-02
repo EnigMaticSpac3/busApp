@@ -9,13 +9,35 @@ busApp/
 │   │   └── gtfs_san_antonio/   # GTFS static data (shapes, stops, routes)
 │   ├── docker-compose.yml      # API + PostGIS services
 │   └── Dockerfile
-└── bus_app/            # Flutter frontend
-    └── lib/
-        ├── main.dart
-        ├── screens/map_screen.dart
-        ├── services/           # API + crowdsourcing services
-        └── config/app_config.dart
+├── bus_app/            # Flutter frontend
+│   └── lib/
+│       ├── main.dart
+│       ├── screens/map_screen.dart
+│       ├── services/           # API + crowdsourcing services
+│       └── config/app_config.dart
+└── .agents/            # Agent definitions for multi-agent workflow
+    ├── backend_engineer.md
+    ├── frontend_developer.md
+    ├── devops_agent.md
+    ├── git-flow-guide.md
+    └── create-branch.sh
 ```
+
+## Quick Wins - Estado
+
+### ✅ Completados
+| # | Rama | Descripción | Fecha |
+|---|------|-------------|-------|
+| 1 | `chore/devops-*` | Multi-stage Docker + docker-compose optimization | 2025-05-02 |
+| 2 | `feat/frontend-*` | Aplicar paleta corporativa (#283C90, #C8D527, #E88D67) | 2025-05-02 |
+| 3 | `fix/backend-*` | precision_m filter (>50m reject) | 2025-05-02 |
+| 4 | `fix/backend-*` | Velocidad máxima 22→16 m/s (~60 km/h) | 2025-05-02 |
+
+### 🔜 Pendientes
+- WebSocket para tiempo real
+- PostGIS con persistencia de trayectorias
+- Selector de rutas múltiples
+- Modo offline con GTFS cacheado
 
 ## How to Run
 
@@ -30,7 +52,9 @@ docker-compose up --build
 ### Frontend
 ```bash
 cd bus_app
-flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8080
+flutter build apk --debug  # Para Android
+# O
+flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8080  # Para web
 ```
 
 ## Critical Configurations
@@ -41,8 +65,9 @@ flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8080
 
 ## Map Matching Thresholds (in `backend_bus_app/app/main.py:44-47`)
 - Distance to route: 35m (acceptable for urban Panama)
-- Speed: 1.4-22 m/s (~5-79 km/h) - upper limit too high, buses rarely exceed 60 km/h
+- Speed: 1.4-16 m/s (~5-60 km/h) - UPDATED: reduced from 22 to 16 m/s
 - Bus assignment proximity: 200m
+- GPS precision filter: >50m rejected (UPDATED)
 
 ## Known Limitations
 - PostGIS container runs but GTFS loads from CSV files into memory, not DB
@@ -57,6 +82,29 @@ flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8080
 - Add more buses: extend the `buses` list in `main.py:55-62`
 - Change colors: update `Colors.blueAccent` in Flutter widgets (corporate palette: #283C90, #C8D527, #E88D67)
 
+## Multi-Agent Workflow
+
+### Activar un agente
+```bash
+# 1. Leer el archivo del agente
+cat .agents/backend_engineer.md
+
+# 2. Ejecutar opencode y pegar el prompt de activación
+opencode
+```
+
+### Flujo típico
+1. Agent crea rama automáticamente (`feat/frontend-descripcion`)
+2. Trabaja en los archivos de su dominio
+3. Commits con conventional commits
+4. Push a origin
+5. Crear PR → Review → Merge
+
+### Quick Win script
+```bash
+./.agents/create-branch.sh [frontend|backend|devops] "descripcion"
+```
+
 ## Key Commands
 ```bash
 # Backend only
@@ -67,6 +115,9 @@ docker-compose up
 
 # Force rebuild
 docker-compose up --build --force-recreate
+
+# Flutter build APK
+cd bus_app && flutter build apk --debug
 
 # Flutter web
 flutter run -d chrome

@@ -27,10 +27,14 @@
 - Timeout de contribuidor: 15 segundos
 - Single route hardcoded: `SHAPE_ID = "SA_R1"`
 
-## 🔧 Quick Wins Activos (prioridad)
-1. **precision_m validation**: El campo ya se recibe (línea 314) pero no se usa en map_matching. Agregar validación > 50m rechaza contribuye.
-2. **Velocidad thresholds**: Reducir UMBRAL_VELOCIDAD_MAX_MS de 22 a 16.
-3. **Logging cleanup**: El log en línea 347 ejecuta en CADA map_matching - agregar verificador de environment.
+## ✅ Quick Wins Completados
+1. ~~precision_m validation~~ - Implementado en commit merge
+2. ~~Velocidad thresholds~~ - Reducido de 22 a 16 m/s
+
+## 🔧 Quick Wins Activos (pendientes)
+- Logging cleanup: El log en línea 347 ejecuta en CADA map_matching - agregar verificador de environment
+- WebSocket para tiempo real
+- Integración PostGIS
 
 ## 🚀 Big Bets (2-4 semanas)
 1. WebSocket para tiempo real (`/ws/flota`)

@@ -26,11 +26,15 @@
 | FAB inactivo | #283C90 | Colors.blueAccent | map_screen.dart:168 |
 | Banner ETA | #E88D67 | amber | eta_banner.dart:49 |
 
-## 🔧 Quick Wins Activos (prioridad)
-1. **Aplicar ThemeData** en `main.dart:18-20` con ColorScheme.fromSeed usando #283C90
-2. **Cambiar polyline color** en `map_screen.dart:217` a #C8D527
-3. **Actualizar bus marker** en `bus_marker.dart` para usar #E88D67
-4. **Hardcoded Bus-01**: El ETA banner siempre muestra "Bus-01" (línea 42-43 eta_banner.dart) - hacer dinámico
+## ✅ Quick Wins Completados
+1. ~~Aplicar ThemeData~~ - Implementado
+2. ~~Cambiar polyline color~~ - Implementado
+3. ~~Actualizar bus marker~~ - Implementado
+
+## 🔧 Quick Wins Activos (pendientes)
+- Hardcoded Bus-01: El ETA banner siempre muestra "Bus-01" (línea 42-43 eta_banner.dart) - hacer dinámico
+- Selector de rutas múltiples
+- Búsqueda de paradas
 
 ## 📱 Estado Actual
 - Polling cada 2 segundos (`flotaPollingSegundos = 15` en app_config.dart)
