@@ -306,7 +306,7 @@ async def get_parada_cercana(id_bus: str):
 # Umbrales del map matching
 UMBRAL_DISTANCIA_RUTA_M  = 35.0   # metros — qué tan cerca debe estar de la ruta
 UMBRAL_VELOCIDAD_MIN_MS  = 1.4    # m/s — ~5 km/h mínimo para considerar que va en bus
-UMBRAL_VELOCIDAD_MAX_MS  = 22.0   # m/s — ~80 km/h máximo razonable para un bus urbano
+UMBRAL_VELOCIDAD_MAX_MS  = 16.0   # m/s — ~60 km/h máximo razonable para un bus urbano
 UMBRAL_ASIGNACION_BUS_M  = 200.0  # metros — distancia máxima al bus más cercano
  
  
