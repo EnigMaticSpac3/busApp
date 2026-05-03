@@ -1,113 +1,139 @@
 # Role: DevOps & Infrastructure Specialist
-# Context: Dockerization & Deployment - San Antonio Bus Tracker
+# Context: Dockerization & Deployment — San Antonio Bus Tracker
 # Repository: /home/jgonz/projects/busApp
 
 ## 🎯 Responsabilidad Principal
-- Optimizar imágenes Docker (multi-stage, menor tamaño)
-- Mejorar docker-compose.yml (redes, volúmenes, healthchecks)
-- Crear .dockerignore eficiente
-- Configurar variables de entorno y secretos
+Mantener la infraestructura Docker eficiente y preparar el proyecto
+para deployment en producción cuando sea necesario.
 
-## 📁 Archivos Bajo Tu Dominio
-- `backend_bus_app/Dockerfile` - Imagen de la API
-- `backend_bus_app/docker-compose.yml` - Orquestación
-- `backend_bus_app/.env` - Variables de entorno
-- `backend_bus_app/requirements.txt` - Dependencias Python
-- `.dockerignore` (raíz del proyecto)
+---
 
-## 🔴 Problemas Identificados
+## ✅ Quick Wins Completados
+- Multi-stage Dockerfile implementado (~150MB)
+- .dockerignore creado
+- docker-compose.yml optimizado con healthchecks y red aislada
+- Variables de entorno en .env
 
-### Dockerfile Actual (líneas 1-12)
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-RUN apt-get update && apt-get install -y gcc  # ← innecesario
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .  # ← copia TODO incluyendo venv/
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+---
+
+## 🔧 Quick Wins Activos
+
+### 1. Eliminar servicio db del docker-compose
 ```
-**Problemas:**
-- No hay multi-stage build
-- gcc instalado pero no necesario (no hay compiled extensions)
-- Copia todo el directorio (incluye venv/, __pycache__/, .env)
-- Tamaño de imagen ~500MB+
+Rama: chore/devops-eliminar-db-inutilizada
+```
+PostGIS corre pero no se usa. Eliminar para ahorrar ~300MB RAM.
 
-### docker-compose.yml Actual
 ```yaml
+# docker-compose.yml — eliminar bloque db completo
+# Solo dejar:
 services:
   api:
     build: .
     ports:
       - "8000:8000"
     volumes:
-      - ./app:/app  # ← monta app/ sobreescribiendo lo copiado
+      - ./app:/app
     env_file:
       - .env
-    # depends_on commented out - no espera a DB
-  db:
-    image: postgis/postgis:15-3.3
-    # ... config OK
-```
-**Problemas:**
-- Volumen `./app:/app` sobreescribe lo copiado en build
-- No hay red definida entre servicios
-- No hay volumen para GTFS (se copia en build, no actualizable en runtime)
-- PostGIS corre pero NO se usa en código
-
-## ✅ Quick Wins Completados
-- ~~Multi-stage Dockerfile~~ - Implementado, imagen ~150MB
-- ~~.dockerignore~~ - Creado
-- ~~docker-compose.yml optimizado~~ - Red, healthchecks, restart
-
-## 🔧 Quick Wins Activos (pendientes)
-
-### 1. Multi-stage Dockerfile
-```dockerfile
-# Stage 1: Builder
-FROM python:3.11-slim as builder
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Stage 2: Runner
-FROM python:3.11-slim
-WORKDIR /app
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY app/ /app/
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-**Resultado**: Imagen ~150MB (vs ~500MB)
-
-### 2. .dockerignore
-```
-venv/
-__pycache__/
-*.pyc
-.git/
-.gitignore
-.env
-*.md
-LICENSE
-bus_app/
-.DS_Store
+    restart: unless-stopped
 ```
 
-### 3. docker-compose.yml optimizado
-- Agregar red aislada `backend_network`
-- Comentar o eliminar volumen que sobreescribe
-- Descomentar depends_on para esperar DB
+### 2. Script de startup para desarrollo
+```
+Rama: chore/devops-dev-startup-script
+```
+Automatizar el proceso de iniciar sesión de desarrollo:
+
+```bash
+#!/bin/bash
+# dev-start.sh — ejecutar desde backend_bus_app/
+
+echo "🚌 Iniciando San Antonio Bus Tracker..."
+
+# 1. Levantar backend
+docker compose up api -d
+echo "✅ Backend en http://localhost:8000"
+
+# 2. Recordar ngrok
+echo "⚡ Para exponer al exterior: ngrok http 8000"
+echo "   Luego actualiza app_config.dart con la URL de ngrok"
+
+# 3. Mostrar logs
+docker compose logs api -f
+```
+
+### 3. Variables de entorno para producción
+```
+Rama: chore/devops-env-produccion
+```
+Preparar `.env.example` con todas las variables documentadas
+(sin valores reales) para que otros desarrolladores puedan configurar.
+
+```bash
+# .env.example
+DB_NAME=san_antonio_db
+DB_USER=admin
+DB_PASSWORD=CHANGE_ME
+DB_HOST=db
+DB_PORT=5432
+
+# Cuando se implemente autenticación:
+# SECRET_KEY=CHANGE_ME
+# ALLOWED_ORIGINS=https://tu-dominio.com
+```
+
+---
+
+## 🚀 Big Bets (v3)
+
+### Deployment en producción
+Cuando la app esté lista para salir del entorno local:
+
+**Opción recomendada: Railway.app**
+- Costo: ~$5/mes
+- Docker nativo — el Dockerfile actual funciona sin cambios
+- URL fija (elimina la necesidad de ngrok)
+- PostgreSQL/PostGIS disponible como addon
+
+```bash
+# Cuando sea el momento:
+npm install -g @railway/cli
+railway login
+railway init
+railway up
+```
+
+**Alternativa: Render.com**
+- Free tier disponible (con cold starts)
+- También soporta Docker directamente
+
+### nginx como reverse proxy
+Cuando haya múltiples servicios (API + WebSocket + frontend web):
+```nginx
+location /api/ { proxy_pass http://api:8000; }
+location /ws/  { proxy_pass http://api:8000; upgrade websocket; }
+```
+
+---
+
+## 📋 Estado Actual de Infraestructura
+```
+docker-compose up api     → API en localhost:8000 ✅
+ngrok http 8000           → URL pública temporal ✅
+PostGIS                   → Corre pero sin uso activo ⚠️
+Deployment producción     → Pendiente ⬜
+```
 
 ## 📋 Reglas de Trabajo
-- **SIEMPRE** crear rama nueva: `git checkout -b chore/devops-nombre-tarea`
-- **ANTES** de build: verificar con `docker build --no-cache`
-- PostGIS debe estar en red aislada con la API
-- GTFS puede montarse como volumen (permite updates sin rebuild)
+- **SIEMPRE** crear rama: `git checkout -b chore/devops-nombre-tarea`
+- **NUNCA** commitear archivos .env con valores reales
+- Verificar con `docker build --no-cache` antes de PR
+- Tamaño objetivo de imagen: < 200MB
 
 ## ✅ Definition of Done
-- [ ] `docker-compose up --build` funciona sin errores
-- [ ] Imagen final < 200MB
-- [ ] .dockerignore excluye venv/ y archivos innecesarios
-- [ ] API responde en localhost:8000
-- [ ] Commit sigue: `chore(devops): descripción`
-- [ ] Rama lista para merge
+- [ ] `docker compose up api` arranca en < 10 segundos
+- [ ] Imagen final < 200MB (`docker images`)
+- [ ] .env.example documentado y commiteado
+- [ ] Sin secretos en el código fuente
+- [ ] Commit: `chore(devops): descripción corta`
