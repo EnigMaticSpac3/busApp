@@ -352,11 +352,38 @@ UMBRAL_ASIGNACION_BUS_M  = 200.0  # metros — distancia máxima al bus más cer
  
 class UbicacionUsuario(BaseModel):
     """Payload que envía el celular del usuario contribuidor."""
-    usuario_id: str           # ID anónimo generado en el celular (UUID)
-    lat: float
-    lon: float
-    velocidad_ms: float       # velocidad reportada por el GPS del celular
-    precision_m: Optional[float] = None  # precisión GPS en metros (opcional)
+    session_id:   str           # ID de sesión activa (del endpoint iniciar-sesion-bus)
+    usuario_id:   str           # ID anónimo generado en el celular (UUID)
+    ruta_id:      str = "SA_R1" # ruta por defecto
+    lat:          float
+    lon:          float
+    velocidad_ms: float        # velocidad reportada por el GPS del celular
+    precision_m:  Optional[float] = None  # precisión GPS en metros (opcional)
+
+
+def _calcular_promedio_ponderado(contribuidores: dict) -> tuple[float, float, float]:
+    """
+    Promedio ponderado por recencia — señales más recientes tienen más peso.
+    Ignora contribuidores sin señal en los últimos 30 segundos.
+    """
+    ahora = time.time()
+    lats, lons, vels, pesos = [], [], [], []
+
+    for datos in contribuidores.values():
+        antiguedad = ahora - datos["ts"]
+        if antiguedad > 30 or datos["lat"] == 0.0:
+            continue
+        peso = 1.0 / (1.0 + antiguedad)  # más reciente = más peso
+        lats.append(datos["lat"] * peso)
+        lons.append(datos["lon"] * peso)
+        vels.append(datos["vel_ms"] * peso)
+        pesos.append(peso)
+
+    if not pesos:
+        return 0.0, 0.0, 0.0
+
+    total = sum(pesos)
+    return sum(lats)/total, sum(lons)/total, sum(vels)/total
  
  
 def map_matching(lat: float, lon: float, velocidad_ms: float, precision_m: Optional[float] = None) -> Optional[dict]:
@@ -401,10 +428,10 @@ def map_matching(lat: float, lon: float, velocidad_ms: float, precision_m: Optio
  
  
 @app.post("/api/contribuir-ubicacion")
-async def contribuir_ubicacion(payload: UbicacionUsuario, debug: bool = False):
+async def contribuir_ubicacion(payload: UbicacionUsuario):
     """
     Recibe la ubicación GPS de un usuario contribuidor.
-    Requiere que exista una sesión activa para la ruta.
+    Recibe session_id y ruta_id para identificar la sesión específica.
     La posición del bus se calcula como promedio ponderado de contribuidores.
     """
     # Validación básica de coordenadas
@@ -426,19 +453,25 @@ async def contribuir_ubicacion(payload: UbicacionUsuario, debug: bool = False):
             "vel_ms":  payload.velocidad_ms,
         }
 
-    # En el nuevo modelo, se requiere una sesión activa
-    # Por ahora, verificamos si hay alguna sesión para la ruta por defecto
-    ruta_id = "SA_R1"  # ruta por defecto
-
+    # Buscar la sesión por ruta_id
     async with _sesiones_lock:
-        if ruta_id not in sesiones_activas:
+        if payload.ruta_id not in sesiones_activas:
             return {
                 "estado": "rechazado",
                 "motivo": "no hay sesión activa para esta ruta. Llama primero a /api/iniciar-sesion-bus",
-                "ruta_id": ruta_id,
+                "ruta_id": payload.ruta_id,
             }
 
-        sesion = sesiones_activas[ruta_id]
+        sesion = sesiones_activas[payload.ruta_id]
+
+        # Verificar que el session_id coincida (opcional)
+        if sesion["session_id"] != payload.session_id:
+            return {
+                "estado": "rechazado",
+                "motivo": "session_id no coincide con la sesión activa",
+                "session_id": payload.session_id,
+            }
+
         ahora = time.time()
 
         # Actualizar o agregar contribuidor
@@ -449,23 +482,12 @@ async def contribuir_ubicacion(payload: UbicacionUsuario, debug: bool = False):
             "ts": ahora,
         }
 
-        # Calcular promedio ponderado de posición
-        lats, lons, vels, pesos = [], [], [], []
-        for datos in sesion["contribuidores"].values():
-            antiguedad = ahora - datos["ts"]
-            if antiguedad > 30 or datos["lat"] == 0.0:
-                continue
-            peso = 1.0 / (1.0 + antiguedad)
-            lats.append(datos["lat"] * peso)
-            lons.append(datos["lon"] * peso)
-            vels.append(datos["vel_ms"] * peso)
-            pesos.append(peso)
-
-        if pesos:
-            total = sum(pesos)
-            sesion["lat"] = sum(lats) / total
-            sesion["lon"] = sum(lons) / total
-            sesion["vel_ms"] = sum(vels) / total
+        # Calcular promedio ponderado usando helper
+        lat_prom, lon_prom, vel_prom = _calcular_promedio_ponderado(sesion["contribuidores"])
+        if lat_prom != 0.0:
+            sesion["lat"] = lat_prom
+            sesion["lon"] = lon_prom
+            sesion["vel_ms"] = vel_prom
 
         sesion["ultimo_gps"] = ahora
         sesion["indice_ruta"] = map_result.get("indice_ruta", 0)
