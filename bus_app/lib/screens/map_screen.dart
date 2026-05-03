@@ -119,6 +119,8 @@ class _MapScreenState extends State<MapScreen> {
       _errorRuta    = puntos.isEmpty ? 'No se pudo cargar la ruta' : null;
       _routePoints  = puntos;
     });
+    // Pasamos los puntos de la ruta al servicio de crowdsourcing para geofencing
+    _crowdsourcing.setRutaPoints(puntos);
   }
 
   void _iniciarPolling() {
@@ -157,6 +159,28 @@ class _MapScreenState extends State<MapScreen> {
       ),
       body: Column(
         children: [
+          // Banner de salida de ruta
+          if (_crowdsourcing.estado == EstadoContribucion.fueraRuta)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              width: double.infinity,
+              color: Colors.red.shade100,
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber, color: Colors.red.shade700, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Dejaste de contribuir (saliste de la ruta)',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           EtaBanner(eta: _eta, cargando: _cargandoEta),
           Expanded(child: _buildMapOrState()),
         ],
