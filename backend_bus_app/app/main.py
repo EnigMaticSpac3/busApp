@@ -17,6 +17,7 @@ import math
 import os
 import csv
 import time
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -296,6 +297,50 @@ async def get_parada_cercana(id_bus: str):
         }
 
     return {"parada": "Fin de recorrido", "eta": "--", "distancia": 0}
+
+
+class InicioSesion(BaseModel):
+    """Payload para iniciar sesión en un bus."""
+    usuario_id: str
+    ruta_id: str = "SA_R1"
+
+
+@app.post("/api/iniciar-sesion-bus")
+async def iniciar_sesion_bus(payload: InicioSesion):
+    """
+    Cuando el usuario confirma "estoy en el bus", llama este endpoint.
+    Si ya existe sesión activa para esa ruta → devuelve el session_id existente.
+    Si no existe → crea una nueva sesión.
+    """
+    async with _sesiones_lock:
+        # Si ya existe sesión activa para esta ruta, unirse a ella
+        if payload.ruta_id in sesiones_activas:
+            sesion = sesiones_activas[payload.ruta_id]
+            # Agregar contribuidor si no estaba
+            if payload.usuario_id not in sesion["contribuidores"]:
+                sesion["contribuidores"][payload.usuario_id] = {
+                    "lat": 0.0, "lon": 0.0, "vel_ms": 0.0, "ts": time.time()
+                }
+                log.info(f"Usuario {payload.usuario_id} se unió a sesión {sesion['session_id']}")
+            return {"session_id": sesion["session_id"], "nueva": False, "ruta_id": payload.ruta_id}
+
+        # Crear nueva sesión
+        session_id = str(uuid.uuid4())[:8]
+        sesiones_activas[payload.ruta_id] = {
+            "session_id":    session_id,
+            "ruta_id":       payload.ruta_id,
+            "lat":           0.0,
+            "lon":           0.0,
+            "vel_ms":        0.0,
+            "indice_ruta":   0,
+            "modo":          "incierto",
+            "ultimo_gps":    time.time(),
+            "contribuidores": {
+                payload.usuario_id: {"lat": 0.0, "lon": 0.0, "vel_ms": 0.0, "ts": time.time()}
+            }
+        }
+        log.info(f"Nueva sesión {session_id} creada para ruta {payload.ruta_id}")
+        return {"session_id": session_id, "nueva": True, "ruta_id": payload.ruta_id}
 
 
 # Umbrales del map matching
