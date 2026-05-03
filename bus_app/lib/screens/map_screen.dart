@@ -14,6 +14,7 @@ import '../services/crowdsourcing_service.dart';
 import '../widgets/bus_marker.dart';
 import '../widgets/crowdsourcing_sheet.dart';
 import '../widgets/eta_banner.dart';
+import '../widgets/subida_bus_sheet.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -95,7 +96,14 @@ class _MapScreenState extends State<MapScreen> {
     if (_crowdsourcing.estaActivo) {
       _crowdsourcing.detener();
     } else {
-      await _crowdsourcing.iniciar();
+      // Mostrar sheet de confirmación antes de iniciar
+      await SubidaBusSheet.mostrar(
+        context,
+        busId: _crowdsourcing.busAsignado,
+        onConfirmado: (sessionId) {
+          _crowdsourcing.iniciar();
+        },
+      );
     }
   }
 
