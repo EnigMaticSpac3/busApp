@@ -1,153 +1,127 @@
-# Git Flow Guide - San Antonio Bus Tracker
+# Git Flow Guide — San Antonio Bus Tracker
 
 ## 🌿 Estructura de Ramas
 
 ```
-main (producción)
+main (producción — solo versiones estables)
+  ↑ merge después de QA completo en campo
   ↑
-  ↑ merge solo después de tested complete
-  ↑
-develop (integración)
-  ↑
+develop (integración — rama base de trabajo)
   ↑ merge después de code review
   ↑
-feature/frontend-*
-feature/backend-*
-chore/devops-*
-fix/backend-*
+feat/frontend-*     feat/backend-*     chore/devops-*     refactor/backend-*
 ```
+
+**Regla de oro: nunca trabajar directamente en `main` o `develop`.**
+
+---
 
 ## 📋 Nomenclatura de Ramas
 
 **Formato:** `tipo/agente-descripcion-corta`
 
-### Tipos
 | Prefijo | Uso | Ejemplo |
 |---------|-----|---------|
-| `feat/` | Nueva funcionalidad | `feat/frontend-paleta-colores` |
-| `fix/` | Bug fix | `fix/backend-map-matching-precision` |
-| `chore/` | Mantenimiento, DevOps | `chore/devops-docker-multistage` |
-| `refactor/` | Refactoring sin cambiar comportamiento | `refactor/backend-async-lock` |
+| `feat/` | Nueva funcionalidad | `feat/frontend-marcador-incertidumbre` |
+| `fix/` | Bug fix | `fix/backend-geofencing-salida-ruta` |
+| `chore/` | Infraestructura, config | `chore/devops-comentar-db-docker` |
+| `refactor/` | Refactoring sin cambiar comportamiento | `refactor/backend-eliminar-simulacion` |
 
-### Agentes
-| Código | Agente |
-|--------|--------|
-| `frontend` | Flutter / UI |
-| `backend` | FastAPI / Lógica |
-| `devops` | Docker / Infraestructura |
+---
 
-### Ejemplos válidos
-```
-feat/frontend-aplicar-paleta-colores
-feat/backend-websocket-tiempo-real
-fix/backend-precision-gps-mayor-50m
-chore/devops-docker-multi-stage
-refactor/backend-motor-gps-asyncio
-```
+## 🚀 Flujo de Trabajo
 
-## 🚀 Flujo de Trabajo por Agente
-
-### Paso 1: Preparar tarea
 ```bash
-# Estar en develop actualizado
+# 1. Partir siempre desde develop actualizado
 git checkout develop
 git pull origin develop
 
-# Crear rama para la tarea específica
-git checkout -b feat/frontend-paleta-colores
-```
+# 2. Crear rama para la tarea
+git checkout -b feat/backend-sesion-bus-dinamico
 
-### Paso 2:Trabajar en la rama
-```bash
-# Hacer cambios...
-# ... código ...
+# 3. Trabajar — commits atómicos por cambio lógico
+git add backend_bus_app/app/main.py
+git commit -m "feat(backend): agregar endpoint POST /api/iniciar-sesion-bus"
 
-# Ver estado
-git status
-git diff
-```
+# 4. Push y Pull Request → develop
+git push -u origin feat/backend-sesion-bus-dinamico
+# En GitHub: PR de feat/* → develop → merge
 
-### Paso 3: Commits atómicos
-```bash
-# Un commit por tarea completa
-# Título siguiendo Conventional Commits
-
-git add .
-git commit -m "feat(frontend): aplicar paleta corporativa #283C90, #C8D527, #E88D67"
-
-# Si hay múltiples cambios no relacionados, hacer commits separados
-git add bus_app/lib/main.dart
-git commit -m "feat(frontend): actualizar ThemeData con color corporativo"
-
-git add bus_app/lib/widgets/bus_marker.dart
-git commit -m "feat(frontend): cambiar color de markers a #E88D67"
-```
-
-### Paso 4: Push y Pull Request
-```bash
-# Subir rama
-git push -u origin feat/frontend-paleta-colores
-
-# En GitHub/GitLab: crear PR de feat/frontend-paleta-colores → develop
-# Code review
-# Merge
-```
-
-### Paso 5: Limpieza
-```bash
-# Después de merge exitoso
+# 5. Limpieza local
 git checkout develop
 git pull origin develop
-git branch -d feat/frontend-paleta-colores
-git push origin --delete feat/frontend-paleta-colores  # opcional
+git branch -d feat/backend-sesion-bus-dinamico
 ```
 
-## ⚡ Comandos Rápidos (alias sugeridos)
+---
 
-Agregar a `~/.bashrc` o `~/.zshrc`:
+## 🎯 Backlog Sprint v2 — Buses Dinámicos
 
-```bash
-# Crear rama de feature frontend
-alias gff='git checkout develop && git pull && git checkout -b feat/frontend-$(date +%Y%m%d)-'
+**Orden de ejecución obligatorio** — las tareas de backend deben completarse
+antes de las de frontend que dependen de los nuevos endpoints.
 
-# Crear rama de feature backend
-alias gfb='git checkout develop && git pull && git checkout -b feat/backend-$(date +%Y%m%d)-'
+### Fase 1 — Backend (bloqueante para frontend)
 
-# Crear rama de chore devops
-alias gfd='git checkout develop && git pull && git checkout -b chore/devops-$(date +%Y%m%d)-'
+| # | Rama | Descripción | Dependencias |
+|---|------|-------------|--------------|
+| 1 | `refactor/backend-eliminar-simulacion` | Eliminar lista buses hardcodeada y motor_gps(). Crear sesiones_activas dict. | ninguna |
+| 2 | `feat/backend-sesion-bus-dinamico` | Endpoint POST /api/iniciar-sesion-bus. Sesión única por ruta, múltiples contribuidores. | #1 |
+| 3 | `feat/backend-contribucion-por-sesion` | Modificar /api/contribuir-ubicacion para recibir session_id. Promedio ponderado. | #2 |
+| 4 | `feat/backend-flota-desde-sesiones` | Modificar /api/flota para devolver sesiones con modo e incertidumbre. | #1 |
+| 5 | `feat/backend-monitor-sesiones` | Tarea async de limpieza, geofencing y timeout de sesiones. | #1 |
 
-# Quick commit con tipo
-alias gc='git commit -m'
+### Fase 2 — Frontend (puede iniciar cuando Fase 1 esté en develop)
 
-# Ver ramas locales
-alias gbr='git branch -vv'
+| # | Rama | Descripción | Dependencias |
+|---|------|-------------|--------------|
+| 6 | `feat/frontend-modelo-bus-sesion` | Nuevo modelo BusSesion con opacidad dinámica y etiqueta de tiempo. | Backend #4 |
+| 7 | `feat/frontend-marcador-incertidumbre` | Marcador con opacidad según modo activo/incierto/perdido. | #6 |
+| 8 | `feat/frontend-confirmacion-subida` | Bottom sheet "¿Subiste al E598?" → llama /api/iniciar-sesion-bus → guarda session_id. | Backend #2 |
+| 9 | `feat/frontend-geofencing-local` | CrowdsourcingService detecta salida de ruta usando puntos de /api/ruta. Detiene contribución automáticamente. | #8 |
+| 10 | `feat/frontend-mensaje-sin-buses` | Banner "No hay buses activos" cuando /api/flota devuelve []. | #6 |
+
+### Fase 3 — DevOps (puede hacerse en paralelo)
+
+| # | Rama | Descripción |
+|---|------|-------------|
+| 11 | `chore/devops-comentar-db-docker` | Comentar servicio db en docker-compose (no eliminar, puede ser necesario para PostGIS en v3). |
+| 12 | `chore/devops-env-example` | Crear .env.example documentado sin valores reales. |
+
+---
+
+## 📊 Estado de Ramas
+
 ```
+main     ← v1 estable — crowdsourcing básico con simulación
+develop  ← rama activa — apunta a v2
+```
+
+---
 
 ## 🔒 Reglas de Oro
 
-1. **UNA rama por tarea** - No mezclar feature con fix en la misma rama
-2. **Commits atómicos** - Un solo cambio por commit
-3. **Nunca hacer push directo a main** - Siempre pasar por develop
-4. **Actualizar antes de crear rama** - Siempre hacer `git pull` en develop primero
-5. **Borrar ramas mergeadas** - Mantener limpio el repositorio local
+1. **Una tarea por rama** — no mezclar feat con fix
+2. **Commits atómicos** — un cambio lógico por commit
+3. **Nunca push directo a main o develop**
+4. **Siempre partir de develop actualizado**
+5. **Borrar ramas después del merge**
+6. **Nunca commitear .env con valores reales**
+7. **Backend antes que frontend** — respetar el orden de dependencias
 
-## 📊 Estado Actual de Ramas
+---
 
-```bash
-git branch -vv
-* develop  f2c3a1b [origin/develop] Merge branch 'feat/crowdsourcing-gps'
-  master   f2c3a1b [origin/master] Initial commit
+## 💬 Formato de Commits (Conventional Commits)
+
+```
+feat(backend): agregar endpoint iniciar-sesion-bus
+feat(backend): calcular posición con promedio ponderado
+fix(frontend): corregir opacidad marcador incierto
+chore(devops): comentar servicio db en docker-compose
+refactor(backend): reemplazar buses hardcodeados por sesiones_activas
+docs: actualizar AGENTS.md con modelo v2
 ```
 
-## 🎯 Tasks Activas (del análisis técnico)
-
-| Prioridad | Agente | Tarea | Rama sugerida |
-|-----------|--------|-------|---------------|
-| 1 | DevOps | Docker multi-stage + .dockerignore | `chore/devops-docker-multi-stage` |
-| 2 | Frontend | Aplicar paleta de colores | `feat/frontend-paleta-colores` |
-| 3 | Backend | Agregar precision_m validation | `fix/backend-precision-gps-filter` |
-| 4 | Backend | Reducir velocidad máxima 22→16 m/s | `fix/backend-velocidad-threshold` |
-| 5 | Backend | WebSocket implementation | `feat/backend-websocket-flota` |
+---
 
 ## 🔗 Referencias
 - Conventional Commits: https://www.conventionalcommits.org/
