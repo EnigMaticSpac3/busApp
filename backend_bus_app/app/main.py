@@ -58,13 +58,9 @@ ruta_puntos: list = []
 # Paradas: lista de dicts con stop_id, nombre, lat, lon, indice_ruta, dist_ruta
 paradas_info: list = []
 
-buses = [
-    {"id": "Bus-01", "indice": 0,    "lat": 0.0, "lon": 0.0, "vel_ms": 0.0, "modo": "simulado", "ultimo_gps": 0.0},
-    {"id": "Bus-02", "indice": 500,  "lat": 0.0, "lon": 0.0, "vel_ms": 0.0, "modo": "simulado", "ultimo_gps": 0.0},
-    {"id": "Bus-03", "indice": 1000, "lat": 0.0, "lon": 0.0, "vel_ms": 0.0, "modo": "simulado", "ultimo_gps": 0.0},
-]
-
-_buses_lock = asyncio.Lock()
+# Sesiones activas por ruta (clave: ruta_id)
+sesiones_activas: dict[str, dict] = {}
+_sesiones_lock = asyncio.Lock()
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -178,50 +174,6 @@ def cargar_paradas_desde_gtfs(ruta: list) -> list:
 
 
 # ---------------------------------------------------------------------------
-# Motor GPS
-# ---------------------------------------------------------------------------
-
-async def motor_gps():
-    """
-    Avanza cada bus un punto por tick bajo el lock para evitar race conditions.
-    La velocidad se calcula desde shape_dist_traveled (metros reales entre
-    puntos consecutivos) dividido entre el intervalo del tick (1 segundo).
-    """
-    if not ruta_puntos:
-        log.warning("motor_gps: ruta_puntos vacía, motor detenido.")
-        return
-
-    GRACE_PERIOD_S = 15.0  # segundos para mantener posición GPS antes de volver a simulación
-
-    while True:
-        async with _buses_lock:
-            for bus in buses:
-                es_modo_gps = bus.get("modo") == "gps"
-                tiempo_desde_gps = time.time() - bus.get("ultimo_gps", 0)
-
-                if es_modo_gps and tiempo_desde_gps < GRACE_PERIOD_S:
-                    continue
-
-                if es_modo_gps and tiempo_desde_gps >= GRACE_PERIOD_S:
-                    bus["modo"] = "simulado"
-
-                idx   = bus["indice"]
-                punto = ruta_puntos[idx]
-
-                vel_ms = 0.0
-                if idx > 0:
-                    dist_delta = ruta_puntos[idx]["dist"] - ruta_puntos[idx - 1]["dist"]
-                    vel_ms = dist_delta / 1.0  # metros por segundo
-
-                bus["lat"]    = punto["lat"]
-                bus["lon"]    = punto["lon"]
-                bus["vel_ms"] = round(vel_ms, 2)
-                bus["indice"] = (idx + 1) % len(ruta_puntos)
-
-        await asyncio.sleep(1)
-
-
-# ---------------------------------------------------------------------------
 # Lifespan
 # ---------------------------------------------------------------------------
 
@@ -250,11 +202,9 @@ async def lifespan(app: FastAPI):
         log.error(f"Error al cargar datos GTFS: {e}")
         raise
 
-    tarea_gps = asyncio.create_task(motor_gps())
-    log.info("✅ Motor GPS iniciado.")
+    log.info("✅ Datos GTFS cargados, esperando contribuidores...")
     yield
-    tarea_gps.cancel()
-    log.info("Motor GPS detenido.")
+    log.info("Servidor detenido.")
 
 
 # ---------------------------------------------------------------------------
@@ -278,32 +228,65 @@ async def get_ruta():
 
 @app.get("/api/flota")
 async def get_flota():
-    async with _buses_lock:
-        return [dict(b) for b in buses]
+    """Devuelve sesiones activas (buses dinámicos desde contribuidores)."""
+    async with _sesiones_lock:
+        resultado = []
+        ahora = time.time()
+        for sesion in sesiones_activas.values():
+            seg = ahora - sesion["ultimo_gps"]
+            if seg > 600:  # 10 minutos → no mostrar
+                continue
+            modo = (
+                "activo"   if seg < 15 else
+                "incierto" if seg < 300 else
+                "perdido"
+            )
+            contribuidores_activos = sum(
+                1 for c in sesion["contribuidores"].values()
+                if ahora - c["ts"] < 30
+            )
+            resultado.append({
+                "bus_id":             f"Bus-{sesion['session_id']}",
+                "session_id":         sesion["session_id"],
+                "ruta_id":            sesion["ruta_id"],
+                "lat":                sesion["lat"],
+                "lon":                sesion["lon"],
+                "vel_ms":             sesion["vel_ms"],
+                "indice_ruta":        sesion.get("indice_ruta", 0),
+                "modo":               modo,
+                "segundos_sin_senal": round(seg, 0),
+                "contribuidores_activos": contribuidores_activos,
+            })
+        return resultado
 
 
 @app.get("/api/parada-cercana/{id_bus}")
 async def get_parada_cercana(id_bus: str):
-    async with _buses_lock:
-        bus = next((dict(b) for b in buses if b["id"] == id_bus), None)
+    """Busca la parada más cercana para un bus específico."""
+    # Extraer session_id del formato "Bus-{session_id}" o usar directamente
+    session_id = id_bus.replace("Bus-", "") if id_bus.startswith("Bus-") else id_bus
 
-    if not bus:
+    async with _sesiones_lock:
+        sesion = sesiones_activas.get(session_id)
+
+    if not sesion:
         return {"error": "Bus no encontrado"}
 
     UMBRAL_METROS = 30.0
     parada_futura = None
     dist_minima   = float("inf")
 
+    indice_ruta = sesion.get("indice_ruta", 0)
     for parada in paradas_info:
-        dist_bus_parada = haversine(bus["lat"], bus["lon"], parada["lat"], parada["lon"])
-        if (parada["indice_ruta"] > bus["indice"]
+        dist_bus_parada = haversine(sesion["lat"], sesion["lon"], parada["lat"], parada["lon"])
+        if (parada["indice_ruta"] > indice_ruta
                 and dist_bus_parada > UMBRAL_METROS
                 and dist_bus_parada < dist_minima):
             dist_minima   = dist_bus_parada
             parada_futura = parada
 
     if parada_futura:
-        vel     = bus["vel_ms"] if bus["vel_ms"] > 1.0 else (4 * 1000 / 3600)
+        vel     = sesion["vel_ms"] if sesion["vel_ms"] > 1.0 else (4 * 1000 / 3600)
         minutos = int((dist_minima / vel) // 60)
         eta     = f"{minutos} min" if minutos > 0 else "Menos de 1 min"
         return {
@@ -333,15 +316,16 @@ class UbicacionUsuario(BaseModel):
  
 def map_matching(lat: float, lon: float, velocidad_ms: float, precision_m: Optional[float] = None) -> Optional[dict]:
     """
-    Determina si el usuario está en un bus y cuál.
-  
+    Determina si el usuario está en una zona donde podría estar en un bus.
+    En el modelo de sesiones, la asignación a una sesión específica se hace
+    en contribuir_ubicacion basándose en la ruta activa.
+
     Algoritmo:
       1. ¿La precisión GPS es aceptable? (rechazar si > 50m)
       2. ¿Está dentro de UMBRAL_DISTANCIA_RUTA_M metros de algún punto de la ruta?
       3. ¿Su velocidad es coherente con un bus en movimiento?
-      4. ¿Qué bus de la flota simulada está más cerca?
-  
-    Devuelve el bus asignado o None si no cumple los criterios.
+
+    Devuelve un dict con información de ubicación válida o None si no aplica.
     """
     # Filtro 0: precisión GPS suficiente
     if precision_m is not None and precision_m > 50:
@@ -350,106 +334,108 @@ def map_matching(lat: float, lon: float, velocidad_ms: float, precision_m: Optio
     # Filtro 1: velocidad coherente con un bus
     if not (UMBRAL_VELOCIDAD_MIN_MS <= velocidad_ms <= UMBRAL_VELOCIDAD_MAX_MS):
         return None
- 
+
     # Filtro 2: proximidad a la ruta — buscamos el punto más cercano
     dist_minima_ruta = float("inf")
-    for punto in ruta_puntos:
+    indice_cercano = 0
+    for i, punto in enumerate(ruta_puntos):
         d = haversine(lat, lon, punto["lat"], punto["lon"])
         if d < dist_minima_ruta:
             dist_minima_ruta = d
- 
+            indice_cercano = i
+
     if dist_minima_ruta > UMBRAL_DISTANCIA_RUTA_M:
         return None
- 
-    # Filtro 3: asignar al bus simulado más cercano
-    bus_asignado   = None
-    dist_min_bus   = float("inf")
- 
-    for bus in buses:
-        if bus["lat"] == 0.0 and bus["lon"] == 0.0:
-            continue  # bus sin posición aún
-        d = haversine(lat, lon, bus["lat"], bus["lon"])
-        if d < dist_min_bus:
-            dist_min_bus = d
-            bus_asignado = bus
- 
-    if bus_asignado is None or dist_min_bus > UMBRAL_ASIGNACION_BUS_M:
-        return None
- 
-    return bus_asignado
+
+    # La asignación a sesión se hace en contribuir_ubicacion
+    return {
+        "valido": True,
+        "distancia_ruta": dist_minima_ruta,
+        "indice_ruta": indice_cercano,
+    }
  
  
 @app.post("/api/contribuir-ubicacion")
 async def contribuir_ubicacion(payload: UbicacionUsuario, debug: bool = False):
     """
     Recibe la ubicación GPS de un usuario contribuidor.
-    Corre el map matching para determinar si está en un bus
-    y en cuál, y actualiza su posición.
- 
-    Por ahora actualiza el bus simulado más cercano con la
-    posición real del usuario. Cuando haya múltiples contribuidores
-    en el mismo bus, se promediará la posición (fase 2).
+    Requiere que exista una sesión activa para la ruta.
+    La posición del bus se calcula como promedio ponderado de contribuidores.
     """
     # Validación básica de coordenadas
     if not (-90 <= payload.lat <= 90 and -180 <= payload.lon <= 180):
         return {"estado": "rechazado", "motivo": "coordenadas inválidas"}
- 
+
     # Ignorar señales con precisión GPS muy baja (ej: >50m de error)
     if payload.precision_m is not None and payload.precision_m > 50:
         return {"estado": "rechazado", "motivo": "precisión GPS insuficiente"}
 
-    if debug:
-        # En modo debug asignamos al bus más cercano sin filtros
-        async with _buses_lock:
-            bus_cercano = min(
-                (b for b in buses if b["lat"] != 0.0),
-                key=lambda b: haversine(payload.lat, payload.lon, b["lat"], b["lon"]),
-                default=None
-            )
-        if bus_cercano:
-            return {"estado": "aceptado", "bus_id": bus_cercano["id"]}
-        return {"estado": "ignorado", "motivo": "sin buses activos"}
- 
-    bus = map_matching(payload.lat, payload.lon, payload.velocidad_ms, payload.precision_m)
- 
-    if bus is None:
+    # Map matching: verificar que está en zona de ruta válida
+    map_result = map_matching(payload.lat, payload.lon, payload.velocidad_ms, payload.precision_m)
+    if map_result is None:
         return {
             "estado":  "ignorado",
-            "motivo":  "no se detectó bus cercano o velocidad fuera de rango",
+            "motivo":  "ubicación fuera de ruta o velocidad incompatible con bus",
             "lat":     payload.lat,
             "lon":     payload.lon,
             "vel_ms":  payload.velocidad_ms,
         }
- 
-    # Actualizar posición del bus con la ubicación real del contribuidor
-    async with _buses_lock:
-        for b in buses:
-            if b["id"] == bus["id"]:
-                b["lat"]    = payload.lat
-                b["lon"]    = payload.lon
-                b["vel_ms"] = payload.velocidad_ms
-                b["modo"]   = "gps"
-                b["ultimo_gps"] = time.time()
 
-                dist_min = float("inf")
-                nuevo_indice = b["indice"]
-                for i, punto in enumerate(ruta_puntos):
-                    d = haversine(payload.lat, payload.lon, punto["lat"], punto["lon"])
-                    if d < dist_min:
-                        dist_min = d
-                        nuevo_indice = i
-                b["indice"] = nuevo_indice
-                break
- 
+    # En el nuevo modelo, se requiere una sesión activa
+    # Por ahora, verificamos si hay alguna sesión para la ruta por defecto
+    ruta_id = "SA_R1"  # ruta por defecto
+
+    async with _sesiones_lock:
+        if ruta_id not in sesiones_activas:
+            return {
+                "estado": "rechazado",
+                "motivo": "no hay sesión activa para esta ruta. Llama primero a /api/iniciar-sesion-bus",
+                "ruta_id": ruta_id,
+            }
+
+        sesion = sesiones_activas[ruta_id]
+        ahora = time.time()
+
+        # Actualizar o agregar contribuidor
+        sesion["contribuidores"][payload.usuario_id] = {
+            "lat": payload.lat,
+            "lon": payload.lon,
+            "vel_ms": payload.velocidad_ms,
+            "ts": ahora,
+        }
+
+        # Calcular promedio ponderado de posición
+        lats, lons, vels, pesos = [], [], [], []
+        for datos in sesion["contribuidores"].values():
+            antiguedad = ahora - datos["ts"]
+            if antiguedad > 30 or datos["lat"] == 0.0:
+                continue
+            peso = 1.0 / (1.0 + antiguedad)
+            lats.append(datos["lat"] * peso)
+            lons.append(datos["lon"] * peso)
+            vels.append(datos["vel_ms"] * peso)
+            pesos.append(peso)
+
+        if pesos:
+            total = sum(pesos)
+            sesion["lat"] = sum(lats) / total
+            sesion["lon"] = sum(lons) / total
+            sesion["vel_ms"] = sum(vels) / total
+
+        sesion["ultimo_gps"] = ahora
+        sesion["indice_ruta"] = map_result.get("indice_ruta", 0)
+        sesion["modo"] = "activo"
+
     log.info(
         f"Contribución aceptada: usuario={payload.usuario_id} "
-        f"→ {bus['id']} ({payload.lat:.5f}, {payload.lon:.5f}) "
+        f"→ sesión {sesion['session_id']} ({payload.lat:.5f}, {payload.lon:.5f}) "
         f"vel={payload.velocidad_ms:.1f} m/s"
     )
- 
+
     return {
         "estado":    "aceptado",
-        "bus_id":    bus["id"],
-        "lat":       payload.lat,
-        "lon":       payload.lon,
+        "session_id": sesion["session_id"],
+        "bus_id":    f"Bus-{sesion['session_id']}",
+        "lat":       sesion["lat"],
+        "lon":       sesion["lon"],
     }
