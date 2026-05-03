@@ -7,7 +7,8 @@ class AppConfig {
   // En Chrome (web) localhost funciona porque el navegador corre en la misma máquina.
   // Cuando migremos a dispositivo físico Android/iOS, cambia esto por la IP
   // local de tu máquina (ej: 'http://192.168.1.X:8000').
-  static const String backendUrl = 'http://192.168.0.5:8000';
+  // static const String backendUrl = 'http://192.168.0.5:8000';
+  static const String backendUrl = 'https://library-doodle-keenly.ngrok-free.dev';
 
   // Intervalo de polling a la flota en segundos
   static const int flotaPollingSegundos = 2;
@@ -17,5 +18,5 @@ class AppConfig {
 
   // ⚠️ Modo debug: bypasea el map matching en el backend para pruebas en casa.
   // Cambia a false antes de hacer el commit final / producción.
-  static const bool debugCrowdsourcing = true;
+  static const bool debugCrowdsourcing = false;
 }

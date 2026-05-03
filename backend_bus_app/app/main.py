@@ -16,6 +16,7 @@ import logging
 import math
 import os
 import csv
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -58,9 +59,9 @@ ruta_puntos: list = []
 paradas_info: list = []
 
 buses = [
-    {"id": "Bus-01", "indice": 0,    "lat": 0.0, "lon": 0.0, "vel_ms": 0.0},
-    {"id": "Bus-02", "indice": 500,  "lat": 0.0, "lon": 0.0, "vel_ms": 0.0},
-    {"id": "Bus-03", "indice": 1000, "lat": 0.0, "lon": 0.0, "vel_ms": 0.0},
+    {"id": "Bus-01", "indice": 0,    "lat": 0.0, "lon": 0.0, "vel_ms": 0.0, "modo": "simulado", "ultimo_gps": 0.0},
+    {"id": "Bus-02", "indice": 500,  "lat": 0.0, "lon": 0.0, "vel_ms": 0.0, "modo": "simulado", "ultimo_gps": 0.0},
+    {"id": "Bus-03", "indice": 1000, "lat": 0.0, "lon": 0.0, "vel_ms": 0.0, "modo": "simulado", "ultimo_gps": 0.0},
 ]
 
 _buses_lock = asyncio.Lock()
@@ -190,9 +191,20 @@ async def motor_gps():
         log.warning("motor_gps: ruta_puntos vacía, motor detenido.")
         return
 
+    GRACE_PERIOD_S = 15.0  # segundos para mantener posición GPS antes de volver a simulación
+
     while True:
         async with _buses_lock:
             for bus in buses:
+                es_modo_gps = bus.get("modo") == "gps"
+                tiempo_desde_gps = time.time() - bus.get("ultimo_gps", 0)
+
+                if es_modo_gps and tiempo_desde_gps < GRACE_PERIOD_S:
+                    continue
+
+                if es_modo_gps and tiempo_desde_gps >= GRACE_PERIOD_S:
+                    bus["modo"] = "simulado"
+
                 idx   = bus["indice"]
                 punto = ruta_puntos[idx]
 
@@ -416,6 +428,17 @@ async def contribuir_ubicacion(payload: UbicacionUsuario, debug: bool = False):
                 b["lat"]    = payload.lat
                 b["lon"]    = payload.lon
                 b["vel_ms"] = payload.velocidad_ms
+                b["modo"]   = "gps"
+                b["ultimo_gps"] = time.time()
+
+                dist_min = float("inf")
+                nuevo_indice = b["indice"]
+                for i, punto in enumerate(ruta_puntos):
+                    d = haversine(payload.lat, payload.lon, punto["lat"], punto["lon"])
+                    if d < dist_min:
+                        dist_min = d
+                        nuevo_indice = i
+                b["indice"] = nuevo_indice
                 break
  
     log.info(
