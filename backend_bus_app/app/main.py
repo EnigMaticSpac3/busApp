@@ -175,6 +175,62 @@ def cargar_paradas_desde_gtfs(ruta: list) -> list:
 
 
 # ---------------------------------------------------------------------------
+# Monitor de sesiones
+# ---------------------------------------------------------------------------
+
+async def monitor_sesiones():
+    """
+    Tarea asíncrona que corre cada 60 segundos.
+    Limpia contribuidores inactivos y sesiones perdidas.
+    También detecta geofencing: si la posición promedio está a > 100m de la ruta.
+    """
+    while True:
+        await asyncio.sleep(60)
+        ahora = time.time()
+
+        async with _sesiones_lock:
+            rutas_a_eliminar = []
+            for ruta_id, sesion in sesiones_activas.items():
+                # Limpiar contribuidores sin señal en 60s
+                sesion["contribuidores"] = {
+                    uid: datos for uid, datos in sesion["contribuidores"].items()
+                    if ahora - datos["ts"] < 60
+                }
+
+                # Si no quedan contribuidores y han pasado 10 minutos → eliminar
+                if not sesion["contribuidores"] and ahora - sesion["ultimo_gps"] > TIMEOUT_ELIMINAR_S:
+                    rutas_a_eliminar.append(ruta_id)
+                    continue
+
+                # Geofencing: verificar que la posición está en la ruta
+                if sesion["lat"] != 0.0 and ruta_puntos:
+                    dist_min = min(
+                        haversine(sesion["lat"], sesion["lon"], p["lat"], p["lon"])
+                        for p in ruta_puntos
+                    )
+                    if dist_min > GEOFENCING_SALIDA_M:
+                        log.info(f"Sesión {sesion['session_id']} fuera de ruta "
+                                 f"({dist_min:.0f}m) → marcada como perdida")
+                        sesion["modo"] = "perdido"
+
+                # Actualizar modo basado en tiempo sin señal
+                seg_sin_senal = ahora - sesion["ultimo_gps"]
+                if seg_sin_senal < TIMEOUT_INCIERTO_S:
+                    sesion["modo"] = "activo"
+                elif seg_sin_senal < TIMEOUT_PERDIDO_S:
+                    sesion["modo"] = "incierto"
+                else:
+                    sesion["modo"] = "perdido"
+
+            for ruta_id in rutas_a_eliminar:
+                log.info(f"Sesión {sesiones_activas[ruta_id]['session_id']} eliminada por timeout")
+                del sesiones_activas[ruta_id]
+
+            if rutas_a_eliminar:
+                log.info(f"Monitor: {len(sesiones_activas)} sesiones activas")
+
+
+# ---------------------------------------------------------------------------
 # Lifespan
 # ---------------------------------------------------------------------------
 
@@ -204,7 +260,14 @@ async def lifespan(app: FastAPI):
         raise
 
     log.info("✅ Datos GTFS cargados, esperando contribuidores...")
+
+    # Iniciar monitor de sesiones
+    tarea_monitor = asyncio.create_task(monitor_sesiones())
+    log.info("✅ Monitor de sesiones iniciado (cada 60s)")
+
     yield
+    tarea_monitor.cancel()
+    log.info("Monitor de sesiones detenido.")
     log.info("Servidor detenido.")
 
 
@@ -348,6 +411,13 @@ UMBRAL_DISTANCIA_RUTA_M  = 35.0   # metros — qué tan cerca debe estar de la r
 UMBRAL_VELOCIDAD_MIN_MS  = 1.4    # m/s — ~5 km/h mínimo para considerar que va en bus
 UMBRAL_VELOCIDAD_MAX_MS  = 16.0   # m/s — ~60 km/h máximo razonable para un bus urbano
 UMBRAL_ASIGNACION_BUS_M  = 200.0  # metros — distancia máxima al bus más cercano
+
+# Umbrales del monitor de sesiones
+GEOFENCING_SALIDA_M   = 100.0  # metros para detectar salida de ruta
+TIMEOUT_INCIERTO_S    = 15     # segundos sin señal → modo incierto
+TIMEOUT_PERDIDO_S     = 300   # 5 minutos → modo perdido
+TIMEOUT_ELIMINAR_S    = 600   # 10 minutos → eliminar sesión
+VENTANA_PROMEDIO_S    = 30    # segundos de ventana para promedio ponderado
  
  
 class UbicacionUsuario(BaseModel):
