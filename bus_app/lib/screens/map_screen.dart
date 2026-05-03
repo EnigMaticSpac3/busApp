@@ -7,7 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
-import '../models/bus_model.dart';
+import '../models/bus_sesion_model.dart';
 import '../models/eta_model.dart';
 import '../services/api_service.dart';
 import '../services/crowdsourcing_service.dart';
@@ -28,7 +28,7 @@ class _MapScreenState extends State<MapScreen> {
 
   // Estado del mapa
   List<LatLng> _routePoints = [];
-  List<Bus>    _flota       = [];
+  List<BusSesion> _flota = [];
   EtaParada?   _eta;
 
   // Estado de carga
@@ -128,7 +128,7 @@ class _MapScreenState extends State<MapScreen> {
     ]);
     if (!mounted) return;
     setState(() {
-      _flota       = resultados[0] as List<Bus>;
+      _flota = resultados[0] as List<BusSesion>;
       _eta         = resultados[1] as EtaParada?;
       _cargandoEta = false;
     });

@@ -9,7 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 import '../config/app_config.dart';
-import '../models/bus_model.dart';
+import '../models/bus_sesion_model.dart';
 import '../models/eta_model.dart';
 
 class ApiService {
@@ -53,7 +53,7 @@ class ApiService {
 
   /// Obtiene la posición actual de todos los buses.
   /// Se llama periódicamente (polling).
-  Future<List<Bus>> fetchFlota() async {
+  Future<List<BusSesion>> fetchFlota() async {
     try {
       final response = await http
           .get(Uri.parse('$_base/api/flota'))
@@ -62,7 +62,7 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as List;
         return data
-            .map((json) => Bus.fromJson(json as Map<String, dynamic>))
+            .map((json) => BusSesion.fromJson(json as Map<String, dynamic>))
             .toList();
       }
       debugPrint('fetchFlota: status ${response.statusCode}');
