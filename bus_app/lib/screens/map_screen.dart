@@ -232,28 +232,51 @@ class _MapScreenState extends State<MapScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return FlutterMap(
-      options: const MapOptions(
-        initialCenter: LatLng(9.0561, -79.4582),
-        initialZoom: 15.0,
-      ),
+    return Stack(
       children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.example.bus_app',
-        ),
-        PolylineLayer(
-          polylines: [
-            Polyline(
-              points: _routePoints,
-              color: const Color(0xFFC8D527).withOpacity(0.6),
-              strokeWidth: 4,
+        FlutterMap(
+          options: const MapOptions(
+            initialCenter: LatLng(9.0561, -79.4582),
+            initialZoom: 15.0,
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.example.bus_app',
+            ),
+            PolylineLayer(
+              polylines: [
+                Polyline(
+                  points: _routePoints,
+                  color: const Color(0xFFC8D527).withOpacity(0.6),
+                  strokeWidth: 4,
+                ),
+              ],
+            ),
+            MarkerLayer(
+              markers: buildBusMarkers(_flota),
             ),
           ],
         ),
-        MarkerLayer(
-          markers: buildBusMarkers(_flota),
-        ),
+        // Mensaje cuando no hay buses activos
+        if (_flota.isEmpty && !_cargandoRuta)
+          Positioned(
+            bottom: 80,
+            left: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black87,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                "No hay buses activos en este momento.\nSé el primero en contribuir.",
+                style: TextStyle(color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
       ],
     );
   }
