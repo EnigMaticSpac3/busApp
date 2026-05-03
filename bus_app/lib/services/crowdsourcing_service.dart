@@ -7,24 +7,31 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
 import '../models/contribution_model.dart';
 
-enum EstadoContribucion { inactivo, activo, ignorado, error }
+enum EstadoContribucion { inactivo, activo, ignorado, error, fueraRuta }
 
 class CrowdsourcingService extends ChangeNotifier {
   EstadoContribucion _estado    = EstadoContribucion.inactivo;
   String?            _busAsignado;
   String?            _usuarioId;
   Timer?             _timer;
+  List<LatLng>       _rutaPoints = [];
 
   EstadoContribucion get estado      => _estado;
   String?            get busAsignado => _busAsignado;
   bool               get estaActivo  =>
       _estado == EstadoContribucion.activo ||
       _estado == EstadoContribucion.ignorado;
+
+  /// Permite establecer los puntos de la ruta para geofencing.
+  void setRutaPoints(List<LatLng> puntos) {
+    _rutaPoints = puntos;
+  }
   // estaActivo incluye 'ignorado' para que el botón no cambie a azul
   // mientras el backend no detecta bus — el usuario SÍ está contribuyendo,
   // solo que aún no fue asignado a un bus
@@ -97,6 +104,22 @@ class CrowdsourcingService extends ChangeNotifier {
   }
 
   // -------------------------------------------------------------------------
+  // Geofencing
+  // -------------------------------------------------------------------------
+
+  /// Verifica si la posición está dentro de 100m de algún punto de la ruta.
+  bool _estaEnRuta(LatLng posicion) {
+    if (_rutaPoints.isEmpty) return true; // Sin ruta, permitimos todo
+    const umbralM = 100.0;
+    const distance = Distance();
+    for (final punto in _rutaPoints) {
+      final dist = distance.as(LengthUnit.Meter, posicion, punto);
+      if (dist <= umbralM) return true;
+    }
+    return false;
+  }
+
+  // -------------------------------------------------------------------------
   // Envío de ubicación
   // -------------------------------------------------------------------------
 
@@ -107,6 +130,16 @@ class CrowdsourcingService extends ChangeNotifier {
           accuracy: LocationAccuracy.high,
         ),
       );
+
+      // Verificar geofencing: si está fuera de la ruta, detener contribución
+      final posicionLatLng = LatLng(posicion.latitude, posicion.longitude);
+      if (!_estaEnRuta(posicionLatLng)) {
+        _estado = EstadoContribucion.fueraRuta;
+        detener();
+        notifyListeners();
+        debugPrint('Geofencing: usuario salió de la ruta, contribución detenida');
+        return;
+      }
 
       final usuarioId = await _obtenerUsuarioId();
 
