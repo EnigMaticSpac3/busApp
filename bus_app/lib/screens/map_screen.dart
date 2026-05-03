@@ -7,13 +7,14 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
-import '../models/bus_model.dart';
+import '../models/bus_sesion_model.dart';
 import '../models/eta_model.dart';
 import '../services/api_service.dart';
 import '../services/crowdsourcing_service.dart';
 import '../widgets/bus_marker.dart';
 import '../widgets/crowdsourcing_sheet.dart';
 import '../widgets/eta_banner.dart';
+import '../widgets/subida_bus_sheet.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -28,7 +29,7 @@ class _MapScreenState extends State<MapScreen> {
 
   // Estado del mapa
   List<LatLng> _routePoints = [];
-  List<Bus>    _flota       = [];
+  List<BusSesion> _flota = [];
   EtaParada?   _eta;
 
   // Estado de carga
@@ -95,7 +96,14 @@ class _MapScreenState extends State<MapScreen> {
     if (_crowdsourcing.estaActivo) {
       _crowdsourcing.detener();
     } else {
-      await _crowdsourcing.iniciar();
+      // Mostrar sheet de confirmación antes de iniciar
+      await SubidaBusSheet.mostrar(
+        context,
+        busId: _crowdsourcing.busAsignado,
+        onConfirmado: (sessionId) {
+          _crowdsourcing.iniciar();
+        },
+      );
     }
   }
 
@@ -111,6 +119,8 @@ class _MapScreenState extends State<MapScreen> {
       _errorRuta    = puntos.isEmpty ? 'No se pudo cargar la ruta' : null;
       _routePoints  = puntos;
     });
+    // Pasamos los puntos de la ruta al servicio de crowdsourcing para geofencing
+    _crowdsourcing.setRutaPoints(puntos);
   }
 
   void _iniciarPolling() {
@@ -128,7 +138,7 @@ class _MapScreenState extends State<MapScreen> {
     ]);
     if (!mounted) return;
     setState(() {
-      _flota       = resultados[0] as List<Bus>;
+      _flota = resultados[0] as List<BusSesion>;
       _eta         = resultados[1] as EtaParada?;
       _cargandoEta = false;
     });
@@ -149,6 +159,28 @@ class _MapScreenState extends State<MapScreen> {
       ),
       body: Column(
         children: [
+          // Banner de salida de ruta
+          if (_crowdsourcing.estado == EstadoContribucion.fueraRuta)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              width: double.infinity,
+              color: Colors.red.shade100,
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber, color: Colors.red.shade700, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Dejaste de contribuir (saliste de la ruta)',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           EtaBanner(eta: _eta, cargando: _cargandoEta),
           Expanded(child: _buildMapOrState()),
         ],
@@ -200,28 +232,51 @@ class _MapScreenState extends State<MapScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return FlutterMap(
-      options: const MapOptions(
-        initialCenter: LatLng(9.0561, -79.4582),
-        initialZoom: 15.0,
-      ),
+    return Stack(
       children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.example.bus_app',
-        ),
-        PolylineLayer(
-          polylines: [
-            Polyline(
-              points: _routePoints,
-              color: const Color(0xFFC8D527).withOpacity(0.6),
-              strokeWidth: 4,
+        FlutterMap(
+          options: const MapOptions(
+            initialCenter: LatLng(9.0561, -79.4582),
+            initialZoom: 15.0,
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.example.bus_app',
+            ),
+            PolylineLayer(
+              polylines: [
+                Polyline(
+                  points: _routePoints,
+                  color: const Color(0xFFC8D527).withOpacity(0.6),
+                  strokeWidth: 4,
+                ),
+              ],
+            ),
+            MarkerLayer(
+              markers: buildBusMarkers(_flota),
             ),
           ],
         ),
-        MarkerLayer(
-          markers: buildBusMarkers(_flota),
-        ),
+        // Mensaje cuando no hay buses activos
+        if (_flota.isEmpty && !_cargandoRuta)
+          Positioned(
+            bottom: 80,
+            left: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black87,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                "No hay buses activos en este momento.\nSé el primero en contribuir.",
+                style: TextStyle(color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
       ],
     );
   }
