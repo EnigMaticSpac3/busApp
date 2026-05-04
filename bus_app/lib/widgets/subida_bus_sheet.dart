@@ -50,26 +50,45 @@ class _SubidaBusSheetState extends State<SubidaBusSheet> {
   bool _cargando = false;
 
   Future<String?> _crearSesionBus() async {
-    // Generar ID de sesión local si el backend no proporciona uno
-    final sessionId = 'session_${DateTime.now().millisecondsSinceEpoch}_${Random.secure().nextInt(10000)}';
+    // Generar usuario_id anónimo
+    final prefs = await SharedPreferences.getInstance();
+    var usuarioId = prefs.getString('usuario_id');
+    if (usuarioId == null) {
+      usuarioId = List.generate(16, (_) => Random.secure().nextInt(16).toRadixString(16)).join();
+      await prefs.setString('usuario_id', usuarioId);
+    }
+
+    const rutaId = 'SA_R1';
+
+    debugPrint('=== INICIAR SESIÓN ===');
+    debugPrint('usuario_id: $usuarioId');
+    debugPrint('ruta_id: $rutaId');
 
     try {
       final response = await http
           .post(
             Uri.parse('${AppConfig.backendUrl}/api/iniciar-sesion-bus'),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'session_id': sessionId}),
+            body: jsonEncode({
+              'usuario_id': usuarioId,
+              'ruta_id': rutaId,
+            }),
           )
           .timeout(const Duration(seconds: 5));
 
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        return data['session_id'] as String? ?? sessionId;
+        final sessionId = data['session_id'] as String?;
+        debugPrint('session_id recibido: $sessionId');
+        return sessionId;
       }
-      return sessionId; // Usar local si el backend no responde
+      return null;
     } catch (e) {
       debugPrint('Error creando sesión bus: $e');
-      return sessionId; // Usar local si falla
+      return null;
     }
   }
 
@@ -77,12 +96,19 @@ class _SubidaBusSheetState extends State<SubidaBusSheet> {
     setState(() => _cargando = true);
 
     final sessionId = await _crearSesionBus();
-    if (sessionId == null) return;
+    if (sessionId == null) {
+      debugPrint('ERROR: No se pudo obtener session_id');
+      setState(() => _cargando = false);
+      return;
+    }
 
-    // Guardar session_id en SharedPreferences
+    // Guardar session_id y ruta_id en SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('session_id', sessionId);
+    await prefs.setString('ruta_id', 'SA_R1');
     await prefs.setBool('contribuyendo', true);
+
+    debugPrint('session_id guardado: $sessionId');
 
     if (mounted) {
       Navigator.pop(context, true);

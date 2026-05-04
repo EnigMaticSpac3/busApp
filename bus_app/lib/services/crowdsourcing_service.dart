@@ -141,7 +141,22 @@ class CrowdsourcingService extends ChangeNotifier {
         return;
       }
 
+      final prefs = await SharedPreferences.getInstance();
+      final sessionId = prefs.getString('session_id');
+      final rutaId = prefs.getString('ruta_id') ?? 'SA_R1';
+
+      if (sessionId == null || sessionId.isEmpty) {
+        debugPrint('ERROR: No hay session_id - no se debería enviar contribución');
+        return;
+      }
+
       final usuarioId = await _obtenerUsuarioId();
+
+      debugPrint('=== ENVIAR CONTRIBUCIÓN ===');
+      debugPrint('sessionId: $sessionId');
+      debugPrint('rutaId: $rutaId');
+      debugPrint('usuarioId: $usuarioId');
+      debugPrint('lat: ${posicion.latitude}, lon: ${posicion.longitude}');
 
       // En modo debug simulamos velocidad de bus para bypasear el map matching
       final velocidad = AppConfig.debugCrowdsourcing
@@ -149,12 +164,16 @@ class CrowdsourcingService extends ChangeNotifier {
           : (posicion.speed < 0 ? 0.0 : posicion.speed);
 
       final payload = ContribucionUbicacion(
+        sessionId:   sessionId,
+        rutaId:      rutaId,
         usuarioId:   usuarioId,
         lat:         posicion.latitude,
         lon:         posicion.longitude,
         velocidadMs: velocidad,
         precisionM:  posicion.accuracy,
       );
+
+      debugPrint('payload: ${payload.toJson()}');
 
       final response = await http
           .post(
@@ -164,6 +183,8 @@ class CrowdsourcingService extends ChangeNotifier {
             body: jsonEncode(payload.toJson()),
           )
           .timeout(const Duration(seconds: 5));
+
+      debugPrint('contribuir-ubicacion response: ${response.statusCode} - ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
