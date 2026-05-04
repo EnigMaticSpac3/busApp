@@ -328,6 +328,31 @@ async def get_rutas():
     return {"rutas": resultado}
 
 
+@app.get("/api/rutas/{ruta_id}/paradas")
+async def get_paradas_ruta(ruta_id: str):
+    """
+    Devuelve las paradas de una ruta en orden, con su posición
+    en la secuencia del recorrido.
+    """
+    # Filtrar paradas por ruta_id si hay múltiples rutas
+    # Por ahora usamos paradas_info que corresponde a la ruta actual
+    paradas_ordenadas = sorted(paradas_info, key=lambda p: p.get("indice_ruta", 0))
+
+    return {
+        "ruta_id": ruta_id,
+        "paradas": [
+            {
+                "stop_id":   p["stop_id"],
+                "nombre":    p["nombre"],
+                "lat":       p["lat"],
+                "lon":       p["lon"],
+                "secuencia": i,
+            }
+            for i, p in enumerate(paradas_ordenadas)
+        ]
+    }
+
+
 @app.get("/api/flota")
 async def get_flota():
     """Devuelve sesiones activas (buses dinámicos desde contribuidores)."""
