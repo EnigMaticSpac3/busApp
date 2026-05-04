@@ -60,6 +60,10 @@ class _SubidaBusSheetState extends State<SubidaBusSheet> {
 
     const rutaId = 'SA_R1';
 
+    debugPrint('=== INICIAR SESIÓN ===');
+    debugPrint('usuario_id: $usuarioId');
+    debugPrint('ruta_id: $rutaId');
+
     try {
       final response = await http
           .post(
@@ -72,9 +76,14 @@ class _SubidaBusSheetState extends State<SubidaBusSheet> {
           )
           .timeout(const Duration(seconds: 5));
 
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        return data['session_id'] as String?;
+        final sessionId = data['session_id'] as String?;
+        debugPrint('session_id recibido: $sessionId');
+        return sessionId;
       }
       return null;
     } catch (e) {
@@ -88,6 +97,7 @@ class _SubidaBusSheetState extends State<SubidaBusSheet> {
 
     final sessionId = await _crearSesionBus();
     if (sessionId == null) {
+      debugPrint('ERROR: No se pudo obtener session_id');
       setState(() => _cargando = false);
       return;
     }
@@ -97,6 +107,8 @@ class _SubidaBusSheetState extends State<SubidaBusSheet> {
     await prefs.setString('session_id', sessionId);
     await prefs.setString('ruta_id', 'SA_R1');
     await prefs.setBool('contribuyendo', true);
+
+    debugPrint('session_id guardado: $sessionId');
 
     if (mounted) {
       Navigator.pop(context, true);

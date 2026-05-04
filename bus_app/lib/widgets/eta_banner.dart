@@ -6,8 +6,9 @@ import '../models/eta_model.dart';
 class EtaBanner extends StatelessWidget {
   final EtaParada? eta;
   final bool cargando;
+  final String? busId;
 
-  const EtaBanner({super.key, this.eta, this.cargando = false});
+  const EtaBanner({super.key, this.eta, this.cargando = false, this.busId});
 
   @override
   Widget build(BuildContext context) {
@@ -37,10 +38,11 @@ class EtaBanner extends StatelessWidget {
   }
 
   String get _texto {
+    final id = busId ?? 'Bus';
     if (cargando) return 'Conectando con el servidor...';
     if (eta == null) return 'Sin datos de ETA';
-    if (eta!.esFinDeRecorrido) return 'Bus-01 — Fin de recorrido';
-    return 'Bus-01 → ${eta!.parada}  ·  ${eta!.eta}  ·  ${eta!.distanciaMetros.toInt()} m';
+    if (eta!.esFinDeRecorrido) return '$id — Fin de recorrido';
+    return '$id → ${eta!.parada}  ·  ${eta!.eta}  ·  ${eta!.distanciaMetros.toInt()} m';
   }
 
   Color get _colorFondo {

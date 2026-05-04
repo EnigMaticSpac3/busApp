@@ -31,6 +31,7 @@ class _MapScreenState extends State<MapScreen> {
   List<LatLng> _routePoints = [];
   List<BusSesion> _flota = [];
   EtaParada?   _eta;
+  String?      _currentSessionId;
 
   // Estado de carga
   bool    _cargandoRuta = true;
@@ -101,6 +102,7 @@ class _MapScreenState extends State<MapScreen> {
         context,
         busId: _crowdsourcing.busAsignado,
         onConfirmado: (sessionId) {
+          setState(() => _currentSessionId = sessionId);
           _crowdsourcing.iniciar();
         },
       );
@@ -132,10 +134,10 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _actualizarFlotaYEta() async {
-    // Obtener session_id desde SharedPreferences
+    // Usar session_id del estado, o desde SharedPreferences como fallback
     final prefs = await SharedPreferences.getInstance();
-    final sessionId = prefs.getString('session_id');
-    final busId = sessionId ?? 'Bus-01'; // Fallback al anterior
+    final sessionId = _currentSessionId ?? prefs.getString('session_id');
+    final busId = sessionId ?? 'Bus'; // No hardcodear "Bus-01"
 
     final resultados = await Future.wait([
       _api.fetchFlota(),
@@ -186,7 +188,7 @@ class _MapScreenState extends State<MapScreen> {
                 ],
               ),
             ),
-          EtaBanner(eta: _eta, cargando: _cargandoEta),
+          EtaBanner(eta: _eta, cargando: _cargandoEta, busId: _currentSessionId),
           Expanded(child: _buildMapOrState()),
         ],
       ),
