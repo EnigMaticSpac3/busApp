@@ -49,6 +49,8 @@ busApp/
 | 13 | `feat/frontend-*` | Confirmación de subida al bus | 2025-05-03 |
 | 14 | `feat/frontend-*` | Geofencing local para salida de ruta | 2025-05-03 |
 | 15 | `feat/frontend-*` | Mensaje cuando no hay buses activos | 2025-05-03 |
+| 16 | `fix/frontend-*` | Integración con backend v2 - payloads con sessionId/rutaId | 2025-05-03 |
+| 17 | `fix/frontend-*` | Debug logs y corregir eta_banner para usar session_id real | 2025-05-03 |
 
 ### 🔜 Pendientes (v3)
 - WebSocket para tiempo real (eliminar polling)
