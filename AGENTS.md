@@ -52,12 +52,18 @@ busApp/
 | 16 | `fix/frontend-*` | Integración con backend v2 - payloads con sessionId/rutaId | 2025-05-03 |
 | 17 | `fix/frontend-*` | Debug logs y corregir eta_banner para usar session_id real | 2025-05-03 |
 
-### 🔜 Pendientes (v3)
-- WebSocket para tiempo real (eliminar polling)
-- PostGIS con persistencia de trayectorias reales
-- Selector de rutas (origen → destino estilo Jakdojade)
-- Modo offline con GTFS cacheado
-- Algoritmo de fusión múltiples contribuidores
+### 🔜 En Progreso (v3)
+- HomeScreen + NavigationBar (Mapa/Rutas)
+- Endpoint GET /api/rutas (backend)
+- Endpoint GET /api/rutas/{ruta_id}/paradas (backend)
+- Ubicación del usuario en el mapa
+- Botón centrar en mi ubicación
+
+### ⬜ Pendientes (v4)
+- WebSocket para tiempo real
+- PostGIS con persistencia
+- Múltiples rutas
+- Modo conductor oficial
 
 ## How to Run
 

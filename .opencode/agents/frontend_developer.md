@@ -3,220 +3,262 @@
 # Repository: /home/jgonz/projects/busApp
 
 ## 🎯 Responsabilidad Principal
-Implementar el nuevo flujo de contribución con confirmación del usuario,
-marcadores dinámicos con indicador de incertidumbre, y geofencing local.
+Implementar navegación con BottomNavigationBar, menú de rutas,
+lista de paradas, y ubicación del usuario en el mapa.
 
 ---
 
-## 📐 Nuevo Flujo de Contribución (v2)
-
-### Antes
-```
-Usuario toca "Contribuir" → GPS activo → backend adivina el bus
-```
-
-### Ahora
-```
-Usuario toca "Estoy en el bus"
-    ↓
-Bottom sheet: "¿Subiste al bus E598?"
-    [Sí, ya subí]   [Todavía no]
-    ↓
-App llama POST /api/iniciar-sesion-bus
-Backend devuelve session_id
-    ↓
-App guarda session_id localmente
-GPS activo → envía cada 5s con session_id
-    ↓
-Geofencing local detecta si usuario salió de la ruta
-    → Si salió → detener contribución automáticamente
-    → Mostrar: "Dejaste de contribuir (saliste de la ruta)"
-```
+## ✅ Estado Actual (v2 completado)
+- Mapa con ruta E598 dibujada
+- Buses dinámicos con opacidad según modo (activo/incierto/perdido)
+- Bottom sheet "¿Subiste al E598?"
+- Contribución GPS con session_id
+- Geofencing local para detectar salida de ruta
+- Mensaje "No hay buses activos"
 
 ---
 
 ## 📁 Archivos Bajo Tu Dominio
 - `bus_app/lib/main.dart`
-- `bus_app/lib/screens/map_screen.dart`
+- `bus_app/lib/screens/`
 - `bus_app/lib/config/app_config.dart`
-- `bus_app/lib/services/api_service.dart`
-- `bus_app/lib/services/crowdsourcing_service.dart`
-- `bus_app/lib/widgets/` — todos los widgets
-- `bus_app/lib/models/` — todos los modelos
+- `bus_app/lib/services/`
+- `bus_app/lib/widgets/`
+- `bus_app/lib/models/`
 
 ---
 
-## 🎨 Paleta Corporativa (ya aplicada ✅)
+## 🎨 Paleta Corporativa
 | Elemento | Color |
 |----------|-------|
-| AppBar | #283C90 |
+| AppBar / NavBar activo | #283C90 |
 | Polyline ruta | #C8D527 |
-| Bus marcador activo | #E88D67 sólido |
-| Bus marcador incierto | #E88D67 al 50% opacidad |
-| Bus marcador perdido | #E88D67 al 20% opacidad |
-| FAB activo | #C8D527 |
-| FAB inactivo | #283C90 |
+| Bus activo | #E88D67 sólido |
+| Bus incierto | #E88D67 50% opacidad |
+| Bus perdido | #E88D67 20% opacidad |
+| FAB contribuir activo | #C8D527 |
+| FAB contribuir inactivo | #283C90 |
 
 ---
 
-## 🔧 Quick Wins Activos
+## 🔧 Tareas Sprint v3
 
-### 1. Nuevo modelo BusSesion
+### Tarea 1 — BottomNavigationBar + HomeScreen
 ```
-Rama: feat/frontend-modelo-bus-sesion
+Rama: feat/frontend-navigation-bar
 ```
-Reemplazar `Bus` con `BusSesion` que incluye `segundos_sin_senal` y `modo`.
+Crear `home_screen.dart` como contenedor principal con dos tabs.
+`map_screen.dart` y `rutas_screen.dart` se convierten en tabs.
 
+**Estructura:**
 ```dart
-// lib/models/bus_sesion_model.dart
-class BusSesion {
-  final String sessionId;
-  final double lat;
-  final double lon;
-  final double velMs;
-  final String modo;           // "activo" | "incierto" | "perdido"
-  final double segundosSinSenal;
+// lib/screens/home_screen.dart
+class HomeScreen extends StatefulWidget { ... }
 
-  bool get esActivo   => modo == "activo";
-  bool get esIncierto => modo == "incierto";
-  bool get esPerdido  => modo == "perdido";
+class _HomeScreenState extends State<HomeScreen> {
+  int _tabIndex = 0;
 
-  // Opacidad del marcador según estado
-  double get opacidad => esActivo ? 1.0 : esIncierto ? 0.5 : 0.2;
+  final List<Widget> _tabs = [
+    const MapScreen(),
+    const RutasScreen(),
+  ];
 
-  // Texto del tooltip
-  String get etiquetaTiempo {
-    if (esActivo) return "En tiempo real";
-    final min = (segundosSinSenal / 60).floor();
-    return "Última señal hace ${min}m";
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _tabs[_tabIndex],
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tabIndex,
+        onDestinationSelected: (i) => setState(() => _tabIndex = i),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.map_outlined),
+            selectedIcon: Icon(Icons.map),
+            label: 'Mapa',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.directions_bus_outlined),
+            selectedIcon: Icon(Icons.directions_bus),
+            label: 'Rutas',
+          ),
+        ],
+      ),
+    );
   }
 }
 ```
 
-### 2. Marcador dinámico con opacidad
+**Actualizar `main.dart`:**
+```dart
+home: const HomeScreen(),  // antes era MapScreen
 ```
-Rama: feat/frontend-marcador-incertidumbre
+
+### Tarea 2 — Modelo RutaModel
+```
+Rama: feat/frontend-modelo-ruta
 ```
 
 ```dart
-// lib/widgets/bus_marker.dart
+// lib/models/ruta_model.dart
+class RutaModel {
+  final String rutaId;
+  final String codigo;      // "E598"
+  final String nombre;
+  final String color;
+  final int busesActivos;
+
+  const RutaModel({...});
+
+  factory RutaModel.fromJson(Map<String, dynamic> json) => RutaModel(
+    rutaId:       json['ruta_id'] as String,
+    codigo:       json['codigo'] as String,
+    nombre:       json['nombre'] as String,
+    color:        json['color'] as String? ?? '007BFF',
+    busesActivos: json['buses_activos'] as int? ?? 0,
+  );
+}
+```
+
+### Tarea 3 — RutasScreen (lista de rutas)
+```
+Rama: feat/frontend-rutas-screen
+```
+Lista de rutas disponibles desde `GET /api/rutas`.
+Al tocar una ruta → navega a `RutaDetalleScreen`.
+
+```dart
+// lib/screens/rutas_screen.dart
+// - ListView con una card por ruta
+// - Muestra: código (E598), nombre, buses activos
+// - Badge verde si hay buses activos, gris si no
+// - Pull to refresh
+```
+
+**Card de ruta:**
+```
+┌────────────────────────────────┐
+│  E598                    🟢 2  │
+│  San Antonio — Enlace Metro    │
+│  ──────────────────────── →   │
+└────────────────────────────────┘
+```
+
+### Tarea 4 — RutaDetalleScreen (lista de paradas)
+```
+Rama: feat/frontend-ruta-detalle-screen
+```
+Lista ordenada de paradas desde `GET /api/rutas/{ruta_id}/paradas`.
+Al tocar una parada → navega al mapa centrado en esa parada.
+
+```dart
+// lib/screens/ruta_detalle_screen.dart
+// - AppBar con nombre de la ruta (E598)
+// - ListView con paradas en orden
+// - Ícono de parada, nombre
+// - Al tocar → Navigator.push(MapScreen centrado en esa parada)
+```
+
+**Item de parada:**
+```
+🚏 Metro San Antonio
+🚏 Entrada San Antonio
+🚏 Academia Bil. San Antonio
+   ...
+```
+
+### Tarea 5 — Ubicación del usuario en el mapa
+```
+Rama: feat/frontend-ubicacion-usuario
+```
+Mostrar la posición del usuario como un marcador especial en el mapa.
+Usar `geolocator` (ya instalado) para obtener la posición en tiempo real.
+
+```dart
+// En map_screen.dart:
+// - Stream de posición del usuario
+// - Marcador azul con círculo de precisión
+// - Actualizar cada vez que cambia la posición
+
+// Marcador usuario:
 Marker(
-  point: LatLng(bus.lat, bus.lon),
-  child: Opacity(
-    opacity: bus.opacidad,
-    child: Column(children: [
-      // Badge con tiempo si es incierto
-      if (bus.esIncierto || bus.esPerdido)
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.black87,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            bus.etiquetaTiempo,
-            style: TextStyle(color: Colors.white, fontSize: 9),
-          ),
-        ),
-      Icon(Icons.directions_bus, color: Color(0xFFE88D67), size: 30),
-    ]),
+  point: _posicionUsuario,
+  child: Container(
+    decoration: BoxDecoration(
+      color: Colors.blue,
+      shape: BoxShape.circle,
+      border: Border.all(color: Colors.white, width: 2),
+    ),
+    width: 16, height: 16,
   ),
 )
 ```
 
-### 3. Bottom sheet de confirmación de subida
+### Tarea 6 — Botón "centrar en mi ubicación"
 ```
-Rama: feat/frontend-confirmacion-subida
+Rama: feat/frontend-boton-centrar-ubicacion
 ```
-Reemplazar el sheet genérico de "¿Quieres contribuir?" por uno específico:
+Botón flotante secundario que centra el mapa en la posición del usuario.
+Cuando el usuario mueve el mapa, el botón aparece para volver a centrarse.
 
 ```dart
-// lib/widgets/subida_bus_sheet.dart
-// Muestra: "¿Subiste al bus E598?"
-// Botones: [Sí, ya subí] [Todavía no]
-// Al confirmar: llama POST /api/iniciar-sesion-bus
-//               guarda session_id en SharedPreferences
-//               activa el GPS
-```
+// En map_screen.dart:
+// - MapController de flutter_map para mover el mapa programáticamente
+// - FAB secundario con ícono Icons.my_location
+// - Al tocar → mapController.move(_posicionUsuario, zoom actual)
+// - Aparece solo cuando el centro del mapa está lejos del usuario
 
-### 4. Geofencing local en CrowdsourcingService
-```
-Rama: feat/frontend-geofencing-salida-ruta
-```
-Cada vez que se recibe una posición GPS, verificar si está dentro de 100m
-de algún punto de la ruta (usando los puntos cacheados de `/api/ruta`).
-
-```dart
-bool _estaEnRuta(LatLng posicion) {
-  const umbralM = 100.0;
-  for (final punto in _rutaPoints) {
-    final dist = const Distance().as(
-      LengthUnit.Meter, posicion, punto,
-    );
-    if (dist <= umbralM) return true;
-  }
-  return false;
-}
-
-// En _enviarUbicacion():
-if (!_estaEnRuta(LatLng(posicion.latitude, posicion.longitude))) {
-  detener();
-  _notificarSalidaRuta(); // snackbar o banner
-  return;
-}
-```
-
-### 5. Mensaje cuando no hay buses activos
-```dart
-// En map_screen.dart, sobre el mapa:
-if (_flota.isEmpty)
-  Positioned(
-    bottom: 80, left: 16, right: 16,
-    child: Container(
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.black87,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        "No hay buses activos en este momento.\n"
-        "Sé el primero en contribuir.",
-        style: TextStyle(color: Colors.white),
-        textAlign: TextAlign.center,
-      ),
-    ),
-  ),
+FloatingActionButton(
+  heroTag: 'centrar',
+  mini: true,
+  onPressed: _centrarEnUsuario,
+  child: const Icon(Icons.my_location),
+)
 ```
 
 ---
 
-## 🚀 Big Bets (v3)
-1. Selector de ruta origen → destino (estilo Jakdojade)
-2. Detección automática de bajada por ruta elegida
-3. Animación suave de marcadores entre polls (interpolación)
-4. Vista de paradas con tiempos de llegada de todos los buses activos
-5. Modo offline con GTFS cacheado en local
+## 🗂️ Estructura de Archivos al Terminar v3
+
+```
+lib/
+  main.dart
+  config/
+    app_config.dart
+  models/
+    bus_sesion_model.dart    ✅ v2
+    contribucion_model.dart  ✅ v2
+    eta_model.dart           ✅ v1
+    ruta_model.dart          ← NUEVO v3
+    parada_model.dart        ← NUEVO v3
+  screens/
+    home_screen.dart         ← NUEVO v3
+    map_screen.dart          ✅ v2
+    rutas_screen.dart        ← NUEVO v3
+    ruta_detalle_screen.dart ← NUEVO v3
+  services/
+    api_service.dart         ← actualizar con fetchRutas() y fetchParadas()
+    crowdsourcing_service.dart ✅ v2
+  widgets/
+    bus_marker.dart          ✅ v2
+    eta_banner.dart          ✅ v1
+    crowdsourcing_sheet.dart ✅ v1
+    subida_bus_sheet.dart    ✅ v2
+```
 
 ---
-
-## 🛠️ Tech Stack Actual
-- Flutter 3.x + Material 3
-- flutter_map + latlong2
-- geolocator (GPS)
-- shared_preferences (session_id, preferencias)
-- http (polling REST)
-- latlong2 Distance() para geofencing local
 
 ## 📋 Reglas de Trabajo
 - **SIEMPRE** crear rama: `git checkout -b feat/frontend-nombre-tarea`
 - **NUNCA** modificar archivos de `backend_bus_app/`
-- Una tarea por rama — no mezclar UI con lógica de servicio
-- Probar en Chrome Y en dispositivo físico antes de PR
+- Seguir Material 3 con `NavigationBar` (no `BottomNavigationBar` legacy)
+- Probar en Chrome Y dispositivo físico antes de PR
 
 ## ✅ Definition of Done
-- [ ] Compila sin warnings en `flutter run -d chrome`
-- [ ] Marcador sólido cuando bus activo, semitransparente cuando incierto
-- [ ] Bottom sheet pregunta "¿Subiste al E598?" antes de activar GPS
-- [ ] Geofencing detiene contribución al salir de la ruta
-- [ ] Mapa muestra mensaje cuando no hay buses activos
+- [ ] `NavigationBar` con tabs Mapa y Rutas funciona
+- [ ] `RutasScreen` muestra E598 con buses activos
+- [ ] Toca E598 → lista de 28 paradas en orden
+- [ ] Toca parada → mapa centrado en esa parada
+- [ ] Punto azul muestra ubicación del usuario
+- [ ] Botón centra el mapa en el usuario
+- [ ] Compila en Chrome y dispositivo físico
 - [ ] Commit: `feat(frontend): descripción corta`
