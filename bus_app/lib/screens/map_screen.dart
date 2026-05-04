@@ -132,9 +132,14 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _actualizarFlotaYEta() async {
+    // Obtener session_id desde SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    final sessionId = prefs.getString('session_id');
+    final busId = sessionId ?? 'Bus-01'; // Fallback al anterior
+
     final resultados = await Future.wait([
       _api.fetchFlota(),
-      _api.fetchEta('Bus-01'),
+      _api.fetchEta(busId),
     ]);
     if (!mounted) return;
     setState(() {

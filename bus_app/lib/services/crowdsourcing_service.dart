@@ -141,6 +141,9 @@ class CrowdsourcingService extends ChangeNotifier {
         return;
       }
 
+      final prefs = await SharedPreferences.getInstance();
+      final sessionId = prefs.getString('session_id') ?? '';
+      final rutaId = prefs.getString('ruta_id') ?? 'SA_R1';
       final usuarioId = await _obtenerUsuarioId();
 
       // En modo debug simulamos velocidad de bus para bypasear el map matching
@@ -149,6 +152,8 @@ class CrowdsourcingService extends ChangeNotifier {
           : (posicion.speed < 0 ? 0.0 : posicion.speed);
 
       final payload = ContribucionUbicacion(
+        sessionId:   sessionId,
+        rutaId:      rutaId,
         usuarioId:   usuarioId,
         lat:         posicion.latitude,
         lon:         posicion.longitude,
