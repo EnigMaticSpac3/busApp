@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import '../models/ruta_model.dart';
 import '../services/api_service.dart';
+import 'ruta_detalle_screen.dart';
 
 class RutasScreen extends StatefulWidget {
   const RutasScreen({super.key});
@@ -114,7 +115,12 @@ class _RutasScreenState extends State<RutasScreen> {
       ),
       child: InkWell(
         onTap: () {
-          // TODO: navegar a RutaDetalleScreen
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RutaDetalleScreen(ruta: ruta),
+            ),
+          );
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(

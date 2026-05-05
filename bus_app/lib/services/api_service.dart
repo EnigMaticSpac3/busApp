@@ -11,6 +11,7 @@ import 'package:latlong2/latlong.dart';
 import '../config/app_config.dart';
 import '../models/bus_sesion_model.dart';
 import '../models/eta_model.dart';
+import '../models/parada_model.dart';
 import '../models/ruta_model.dart';
 
 class ApiService {
@@ -40,6 +41,27 @@ class ApiService {
       return [];
     } catch (e) {
       debugPrint('fetchRutas error: $e');
+      return [];
+    }
+  }
+
+  /// Obtiene las paradas de una ruta específica.
+  Future<List<ParadaModel>> fetchParadas(String rutaId) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$_base/api/rutas/$rutaId/paradas'))
+          .timeout(_timeout);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as List;
+        return data
+            .map((json) => ParadaModel.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
+      debugPrint('fetchParadas: status ${response.statusCode}');
+      return [];
+    } catch (e) {
+      debugPrint('fetchParadas error: $e');
       return [];
     }
   }
