@@ -46,7 +46,27 @@ class _BusMarkerWidget extends StatelessWidget {
                 ),
               ),
             ),
-          const Icon(Icons.directions_bus, color: AppConfig.colorAccent, size: 30),
+          // Bus: círculo blanco con icono naranja
+          Container(
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.directions_bus,
+              color: AppConfig.colorAlert,
+              size: 24,
+            ),
+          ),
         ],
       ),
     );
