@@ -19,18 +19,32 @@ class _RutasScreenState extends State<RutasScreen> {
   List<RutaModel> _rutas = [];
   bool _cargando = true;
   String? _error;
+  Timer? _pollingTimer;
 
   @override
   void initState() {
     super.initState();
     _cargarRutas();
+    // Polling automático cada 5 segundos
+    _pollingTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _cargarRutas(soloActualizar: true),
+    );
   }
 
-  Future<void> _cargarRutas() async {
-    setState(() {
-      _cargando = true;
-      _error = null;
-    });
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _cargarRutas({bool soloActualizar = false}) async {
+    if (!soloActualizar) {
+      setState(() {
+        _cargando = true;
+        _error = null;
+      });
+    }
 
     final rutas = await _api.fetchRutas();
 
@@ -38,8 +52,8 @@ class _RutasScreenState extends State<RutasScreen> {
 
     setState(() {
       _rutas = rutas;
-      _cargando = false;
-      _error = rutas.isEmpty ? 'No se pudieron cargar las rutas' : null;
+      if (!soloActualizar) _cargando = false;
+      if (_rutas.isEmpty && !soloActualizar) _error = 'No se pudieron cargar las rutas';
     });
   }
 
