@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -32,6 +33,7 @@ class _MapScreenState extends State<MapScreen> {
   List<BusSesion> _flota = [];
   EtaParada?   _eta;
   String?      _currentSessionId;
+  LatLng?      _posicionUsuario;
 
   // Estado de carga
   bool    _cargandoRuta = true;
@@ -39,6 +41,7 @@ class _MapScreenState extends State<MapScreen> {
   String? _errorRuta;
 
   Timer? _pollingTimer;
+  StreamSubscription<Position>? _locationSubscription;
 
   // -------------------------------------------------------------------------
   // Ciclo de vida
@@ -50,15 +53,44 @@ class _MapScreenState extends State<MapScreen> {
     _crowdsourcing.addListener(_onCrowdsourcingChange);
     _cargarRuta();
     _iniciarPolling();
+    _iniciarUbicacion();
     _mostrarSheetSiCorresponde();
   }
 
   @override
   void dispose() {
     _pollingTimer?.cancel();
+    _locationSubscription?.cancel();
     _crowdsourcing.removeListener(_onCrowdsourcingChange);
     _crowdsourcing.dispose();
     super.dispose();
+  }
+
+  // -------------------------------------------------------------------------
+  // Ubicación del usuario
+  // -------------------------------------------------------------------------
+
+  Future<void> _iniciarUbicacion() async {
+    // Verificar permisos
+    LocationPermission permiso = await Geolocator.checkPermission();
+    if (permiso == LocationPermission.denied) {
+      permiso = await Geolocator.requestPermission();
+    }
+    if (permiso == LocationPermission.deniedForever) return;
+
+    // Escuchar cambios de ubicación
+    _locationSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5, // metros
+      ),
+    ).listen((Position posicion) {
+      if (mounted) {
+        setState(() {
+          _posicionUsuario = LatLng(posicion.latitude, posicion.longitude);
+        });
+      }
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -261,7 +293,22 @@ class _MapScreenState extends State<MapScreen> {
               ],
             ),
             MarkerLayer(
-              markers: buildBusMarkers(_flota),
+              markers: [
+                ...buildBusMarkers(_flota),
+                if (_posicionUsuario != null)
+                  Marker(
+                    point: _posicionUsuario!,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.blue,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      width: 16,
+                      height: 16,
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
