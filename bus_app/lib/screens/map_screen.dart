@@ -136,6 +136,7 @@ class _MapScreenState extends State<MapScreen> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('ruta_id', ruta.rutaId);
 
+        if (!mounted) return;
         // Mostrar confirmación de subida
         await SubidaBusSheet.mostrar(
           context,
@@ -341,7 +342,7 @@ class _MapScreenState extends State<MapScreen> {
               polylines: [
                 Polyline(
                   points: _routePoints,
-                  color: AppConfig.colorPrimary.withOpacity(0.6),
+                  color: AppConfig.colorPrimary.withValues(alpha: 0.6),
                   strokeWidth: 5,
                 ),
               ],
