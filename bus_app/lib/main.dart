@@ -1,7 +1,7 @@
 // lib/main.dart
 
 import 'package:flutter/material.dart';
-import 'screens/map_screen.dart';
+import 'screens/home_screen.dart';
 
 void main() {
   runApp(const BusApp());
@@ -19,7 +19,7 @@ class BusApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF283C90)),
         useMaterial3: true,
       ),
-      home: const MapScreen(),
+      home: const HomeScreen(),
     );
   }
 }

@@ -11,6 +11,8 @@ import 'package:latlong2/latlong.dart';
 import '../config/app_config.dart';
 import '../models/bus_sesion_model.dart';
 import '../models/eta_model.dart';
+import '../models/parada_model.dart';
+import '../models/ruta_model.dart';
 
 class ApiService {
   final String _base = AppConfig.backendUrl;
@@ -19,7 +21,53 @@ class ApiService {
   static const _timeout = Duration(seconds: 5);
 
   // -------------------------------------------------------------------------
-  // Ruta
+  // Rutas
+  // -------------------------------------------------------------------------
+
+  /// Obtiene la lista de rutas disponibles.
+  Future<List<RutaModel>> fetchRutas() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$_base/api/rutas'))
+          .timeout(_timeout);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as List;
+        return data
+            .map((json) => RutaModel.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
+      debugPrint('fetchRutas: status ${response.statusCode}');
+      return [];
+    } catch (e) {
+      debugPrint('fetchRutas error: $e');
+      return [];
+    }
+  }
+
+  /// Obtiene las paradas de una ruta específica.
+  Future<List<ParadaModel>> fetchParadas(String rutaId) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$_base/api/rutas/$rutaId/paradas'))
+          .timeout(_timeout);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as List;
+        return data
+            .map((json) => ParadaModel.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
+      debugPrint('fetchParadas: status ${response.statusCode}');
+      return [];
+    } catch (e) {
+      debugPrint('fetchParadas error: $e');
+      return [];
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Ruta (puntos)
   // -------------------------------------------------------------------------
 
   /// Descarga los puntos del shape de la ruta.

@@ -290,6 +290,69 @@ async def get_ruta():
     return {"puntos": [{"lat": p["lat"], "lon": p["lon"]} for p in ruta_puntos]}
 
 
+@app.get("/api/rutas")
+async def get_rutas():
+    """
+    Lista todas las rutas disponibles leyendo del GTFS.
+    Incluye cuántos buses activos tiene cada ruta en ese momento.
+    """
+    try:
+        rutas = leer_csv_gtfs("routes.txt")
+    except FileNotFoundError:
+        return {"rutas": [], "error": "GTFS routes.txt no encontrado"}
+
+    async with _sesiones_lock:
+        resultado = []
+        ahora = time.time()
+        for ruta in rutas:
+            ruta_id = ruta.get("route_id", "")
+            buses_activos = 0
+
+            if ruta_id in sesiones_activas:
+                sesion = sesiones_activas[ruta_id]
+                seg = ahora - sesion["ultimo_gps"]
+                if seg < 600:  # sesión no expirada
+                    buses_activos = sum(
+                        1 for c in sesion["contribuidores"].values()
+                        if ahora - c["ts"] < 30
+                    )
+
+            resultado.append({
+                "ruta_id":       ruta_id,
+                "codigo":        ruta.get("route_short_name", ""),
+                "nombre":        ruta.get("route_long_name", ""),
+                "color":         ruta.get("route_color", "007BFF"),
+                "buses_activos": buses_activos,
+            })
+
+    return {"rutas": resultado}
+
+
+@app.get("/api/rutas/{ruta_id}/paradas")
+async def get_paradas_ruta(ruta_id: str):
+    """
+    Devuelve las paradas de una ruta en orden, con su posición
+    en la secuencia del recorrido.
+    """
+    # Filtrar paradas por ruta_id si hay múltiples rutas
+    # Por ahora usamos paradas_info que corresponde a la ruta actual
+    paradas_ordenadas = sorted(paradas_info, key=lambda p: p.get("indice_ruta", 0))
+
+    return {
+        "ruta_id": ruta_id,
+        "paradas": [
+            {
+                "stop_id":   p["stop_id"],
+                "nombre":    p["nombre"],
+                "lat":       p["lat"],
+                "lon":       p["lon"],
+                "secuencia": i,
+            }
+            for i, p in enumerate(paradas_ordenadas)
+        ]
+    }
+
+
 @app.get("/api/flota")
 async def get_flota():
     """Devuelve sesiones activas (buses dinámicos desde contribuidores)."""
