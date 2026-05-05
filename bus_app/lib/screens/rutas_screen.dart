@@ -10,7 +10,9 @@ import '../services/api_service.dart';
 import 'ruta_detalle_screen.dart';
 
 class RutasScreen extends StatefulWidget {
-  const RutasScreen({super.key});
+  final void Function(double lat, double lon, {double zoom})? onCentrarEn;
+
+  const RutasScreen({super.key, this.onCentrarEn});
 
   @override
   State<RutasScreen> createState() => _RutasScreenState();
@@ -136,7 +138,9 @@ class _RutasScreenState extends State<RutasScreen> {
             MaterialPageRoute(
               builder: (context) => RutaDetalleScreen(
                 ruta: ruta,
-                onCentrarEn: widget.onCentrarEn,
+                onCentrarEn: widget.onCentrarEn != null
+                    ? (lat, lon) => widget.onCentrarEn!(lat, lon)
+                    : null,
               ),
             ),
           );
