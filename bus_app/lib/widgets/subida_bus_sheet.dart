@@ -58,7 +58,7 @@ class _SubidaBusSheetState extends State<SubidaBusSheet> {
       await prefs.setString('usuario_id', usuarioId);
     }
 
-    const rutaId = 'SA_R1';
+    const rutaId = 'SA_INTERNAL';
 
     debugPrint('=== INICIAR SESIÓN ===');
     debugPrint('usuario_id: $usuarioId');

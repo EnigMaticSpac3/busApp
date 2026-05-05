@@ -19,11 +19,11 @@ class ParadaModel {
 
   factory ParadaModel.fromJson(Map<String, dynamic> json) {
     return ParadaModel(
-      paradaId: json['parada_id'] as String,
+      paradaId: json['stop_id'] as String,
       nombre:   json['nombre'] as String,
       lat:      (json['lat'] as num).toDouble(),
       lon:      (json['lon'] as num).toDouble(),
-      orden:    json['orden'] as int? ?? 0,
+      orden:    json['secuencia'] as int? ?? 0,
     );
   }
 
