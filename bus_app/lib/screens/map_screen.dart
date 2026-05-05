@@ -15,6 +15,7 @@ import '../services/crowdsourcing_service.dart';
 import '../widgets/bus_marker.dart';
 import '../widgets/crowdsourcing_sheet.dart';
 import '../widgets/eta_banner.dart';
+import '../widgets/seleccionar_ruta_sheet.dart';
 import '../widgets/subida_bus_sheet.dart';
 
 class MapScreen extends StatefulWidget {
@@ -113,12 +114,36 @@ class _MapScreenState extends State<MapScreen> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('crowdsourcing_decidido', true);
         if (mounted) Navigator.pop(context);
-        await _crowdsourcing.iniciar();
+        // Primero seleccionar la ruta
+        await _seleccionarRutaYContinuar();
       },
       onAhora: () async {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('crowdsourcing_decidido', true);
         if (mounted) Navigator.pop(context);
+      },
+    );
+  }
+
+  /// Flow: seleccionar ruta → confirmar subida al bus → iniciar contribución
+  Future<void> _seleccionarRutaYContinuar() async {
+    await SeleccionarRutaSheet.mostrar(
+      context,
+      onRutaSeleccionada: (ruta) async {
+        // Guardar ruta_id seleccionada
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('ruta_id', ruta.rutaId);
+
+        // Mostrar confirmación de subida
+        await SubidaBusSheet.mostrar(
+          context,
+          busId: null,
+          onConfirmado: (sessionId) {
+            setState(() => _currentSessionId = sessionId);
+            _crowdsourcing.setRutaPoints(_routePoints);
+            _crowdsourcing.iniciar();
+          },
+        );
       },
     );
   }
@@ -129,15 +154,7 @@ class _MapScreenState extends State<MapScreen> {
     if (_crowdsourcing.estaActivo) {
       _crowdsourcing.detener();
     } else {
-      // Mostrar sheet de confirmación antes de iniciar
-      await SubidaBusSheet.mostrar(
-        context,
-        busId: _crowdsourcing.busAsignado,
-        onConfirmado: (sessionId) {
-          setState(() => _currentSessionId = sessionId);
-          _crowdsourcing.iniciar();
-        },
-      );
+      await _seleccionarRutaYContinuar();
     }
   }
 
