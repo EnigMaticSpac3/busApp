@@ -32,8 +32,9 @@ class ApiService {
           .timeout(_timeout);
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body) as List;
-        return data
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final rutas = data['rutas'] as List;
+        return rutas
             .map((json) => RutaModel.fromJson(json as Map<String, dynamic>))
             .toList();
       }
@@ -53,8 +54,9 @@ class ApiService {
           .timeout(_timeout);
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body) as List;
-        return data
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final paradas = data['paradas'] as List;
+        return paradas
             .map((json) => ParadaModel.fromJson(json as Map<String, dynamic>))
             .toList();
       }
