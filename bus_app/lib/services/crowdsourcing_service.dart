@@ -143,7 +143,7 @@ class CrowdsourcingService extends ChangeNotifier {
 
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('session_id');
-      final rutaId = prefs.getString('ruta_id') ?? 'SA_R1';
+      final rutaId = prefs.getString('ruta_id') ?? 'SA_INTERNAL';
 
       if (sessionId == null || sessionId.isEmpty) {
         debugPrint('ERROR: No hay session_id - no se debería enviar contribución');
