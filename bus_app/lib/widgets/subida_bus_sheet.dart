@@ -143,13 +143,13 @@ class _SubidaBusSheetState extends State<SubidaBusSheet> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFC8D527).withValues(alpha: 0.1),
+              color: const Color(0xFFbfd244).withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.directions_bus,
               size: 40,
-              color: Color(0xFFC8D527),
+              color: Color(0xFFbfd244),
             ),
           ),
           const SizedBox(height: 16),
@@ -192,7 +192,7 @@ class _SubidaBusSheetState extends State<SubidaBusSheet> {
                   : const Icon(Icons.check),
               label: Text(_cargando ? 'Conectando...' : 'Sí, ya subí'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFC8D527),
+                backgroundColor: const Color(0xFFbfd244),
                 foregroundColor: Colors.black87,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(

@@ -16,7 +16,7 @@ class BusApp extends StatelessWidget {
       title: 'San Antonio Bus Tracker',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF283C90)),
+        colorScheme: ColorScheme.fromSeed(seedColor: AppConfig.colorPrimary),
         useMaterial3: true,
       ),
       home: const HomeScreen(),

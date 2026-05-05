@@ -4,6 +4,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../config/app_config.dart';
 import '../models/ruta_model.dart';
 import '../services/api_service.dart';
 import 'ruta_detalle_screen.dart';
@@ -63,7 +64,7 @@ class _RutasScreenState extends State<RutasScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rutas'),
-        backgroundColor: const Color(0xFF283C90),
+        backgroundColor: AppConfig.colorPrimary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -146,15 +147,15 @@ class _RutasScreenState extends State<RutasScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFC8D527),
+                  color: AppConfig.colorAccent,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   ruta.codigo,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
-                    color: Color(0xFF283C90),
+                    color: AppConfig.colorPrimary,
                   ),
                 ),
               ),

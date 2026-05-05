@@ -3,6 +3,7 @@
 // Bottom sheet para seleccionar la ruta antes de contribuir.
 
 import 'package:flutter/material.dart';
+import '../config/app_config.dart';
 import '../models/ruta_model.dart';
 import '../services/api_service.dart';
 
@@ -119,14 +120,14 @@ class _SeleccionarRutaSheetState extends State<SeleccionarRutaSheet> {
         leading: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFFC8D527),
+            color: AppConfig.colorAccent,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
             ruta.codigo,
             style: const TextStyle(
               fontWeight: FontWeight.bold,
-              color: Color(0xFF283C90),
+              color: AppConfig.colorPrimary,
             ),
           ),
         ),

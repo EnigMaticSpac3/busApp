@@ -218,7 +218,7 @@ class _MapScreenState extends State<MapScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('San Antonio Bus Tracker'),
-        backgroundColor: const Color(0xFF283C90),
+        backgroundColor: AppConfig.colorPrimary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -272,15 +272,18 @@ class _MapScreenState extends State<MapScreen> {
               heroTag: 'centrar',
               onPressed: _centrarEnUsuario,
               backgroundColor: Colors.white,
-              child: const Icon(Icons.my_location, color: Color(0xFF283C90)),
+              child: Icon(Icons.my_location, color: AppConfig.colorPrimary),
             ),
           ),
         // Botón contribuir
         FloatingActionButton.extended(
           heroTag: 'contribuir',
           onPressed: _toggleContribucion,
-          backgroundColor: activo ? const Color(0xFFC8D527) : const Color(0xFF283C90),
-          icon: Icon(activo ? Icons.location_on : Icons.location_off),
+          backgroundColor: activo ? AppConfig.colorAccent : AppConfig.colorPrimary,
+          icon: Icon(
+            activo ? Icons.location_on : Icons.location_off,
+            color: activo ? AppConfig.colorPrimary : Colors.white,
+          ),
           label: Text(
             activo
                 ? (busId != null ? 'En $busId 🟢' : (ignorado ? 'Buscando bus...' : 'Contribuyendo 🟢'))
@@ -338,8 +341,8 @@ class _MapScreenState extends State<MapScreen> {
               polylines: [
                 Polyline(
                   points: _routePoints,
-                  color: const Color(0xFFC8D527).withOpacity(0.6),
-                  strokeWidth: 4,
+                  color: AppConfig.colorPrimary.withOpacity(0.6),
+                  strokeWidth: 5,
                 ),
               ],
             ),
