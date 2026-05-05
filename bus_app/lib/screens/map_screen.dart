@@ -19,7 +19,16 @@ import '../widgets/seleccionar_ruta_sheet.dart';
 import '../widgets/subida_bus_sheet.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  final LatLng? coordenadasIniciales;
+  final double zoomInicial;
+  final VoidCallback? onMapaCentrado;
+
+  const MapScreen({
+    super.key,
+    this.coordenadasIniciales,
+    this.zoomInicial = 16.0,
+    this.onMapaCentrado,
+  });
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -58,6 +67,14 @@ class _MapScreenState extends State<MapScreen> {
     _iniciarPolling();
     _iniciarUbicacion();
     _mostrarSheetSiCorresponde();
+
+    // Si hay coordenadas iniciales (desde RutaDetalle), centrar el mapa
+    if (widget.coordenadasIniciales != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _mapController.move(widget.coordenadasIniciales!, widget.zoomInicial);
+        widget.onMapaCentrado?.call();
+      });
+    }
   }
 
   @override

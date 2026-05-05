@@ -10,8 +10,9 @@ import '../services/api_service.dart';
 
 class RutaDetalleScreen extends StatefulWidget {
   final RutaModel ruta;
+  final void Function(double lat, double lon)? onCentrarEn;
 
-  const RutaDetalleScreen({super.key, required this.ruta});
+  const RutaDetalleScreen({super.key, required this.ruta, this.onCentrarEn});
 
   @override
   State<RutaDetalleScreen> createState() => _RutaDetalleScreenState();

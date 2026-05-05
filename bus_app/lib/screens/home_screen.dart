@@ -3,6 +3,7 @@
 // Pantalla principal con NavigationBar para cambiar entre Mapa y Rutas.
 
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import '../config/app_config.dart';
 import 'map_screen.dart';
 import 'rutas_screen.dart';
@@ -16,18 +17,33 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _tabIndex = 0;
+  LatLng? _coordenadasParaCentrar;
+  double _zoomInicial = 16.0;
 
-  final List<Widget> _tabs = const [
-    MapScreen(),
-    RutasScreen(),
-  ];
+  // Callback para centrar el mapa en una ubicación desde cualquier parte
+  void _centrarEn(double lat, double lon, {double zoom = 16.0}) {
+    setState(() {
+      _tabIndex = 0;
+      _coordenadasParaCentrar = LatLng(lat, lon);
+      _zoomInicial = zoom;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(
         index: _tabIndex,
-        children: _tabs,
+        children: [
+          MapScreen(
+            coordenadasIniciales: _coordenadasParaCentrar,
+            zoomInicial: _zoomInicial,
+            onMapaCentrado: () {
+              setState(() => _coordenadasParaCentrar = null);
+            },
+          ),
+          RutasScreen(onCentrarEn: _centrarEn),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tabIndex,

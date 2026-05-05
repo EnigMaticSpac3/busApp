@@ -134,7 +134,10 @@ class _RutasScreenState extends State<RutasScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => RutaDetalleScreen(ruta: ruta),
+              builder: (context) => RutaDetalleScreen(
+                ruta: ruta,
+                onCentrarEn: widget.onCentrarEn,
+              ),
             ),
           );
         },

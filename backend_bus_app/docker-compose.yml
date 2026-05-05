@@ -6,9 +6,9 @@ services:
       - "8000:8000"
     env_file:
       - .env
-    depends_on:
-      db:
-        condition: service_healthy
+    # depends_on:
+    #   db:
+    #     condition: service_healthy
     networks:
       - backend_network
     restart: unless-stopped
@@ -19,32 +19,32 @@ services:
       retries: 3
       start_period: 10s
 
-  db:
-    image: postgis/postgis:15-3.3
-    container_name: bus_tracker_db
-    env_file:
-      - .env
-    environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    networks:
-      - backend_network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
+  # db:
+  #   image: postgis/postgis:15-3.3
+  #   container_name: bus_tracker_db
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     POSTGRES_USER: ${DB_USER}
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD}
+  #     POSTGRES_DB: ${DB_NAME}
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+  #   networks:
+  #     - backend_network
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 10
+  #     start_period: 10s
 
 networks:
   backend_network:
     driver: bridge
 
-volumes:
-  pgdata:
+# volumes:
+#   pgdata:
