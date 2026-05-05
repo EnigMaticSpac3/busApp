@@ -3,6 +3,7 @@
 // Pantalla de detalle de una ruta - lista de paradas en orden.
 
 import 'package:flutter/material.dart';
+import '../config/app_config.dart';
 import '../models/parada_model.dart';
 import '../models/ruta_model.dart';
 import '../services/api_service.dart';
@@ -50,7 +51,7 @@ class _RutaDetalleScreenState extends State<RutaDetalleScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.ruta.codigo),
-        backgroundColor: const Color(0xFF283C90),
+        backgroundColor: AppConfig.colorPrimary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -105,7 +106,7 @@ class _RutaDetalleScreenState extends State<RutaDetalleScreen> {
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
-          color: const Color(0xFF283C90).withValues(alpha: 0.1),
+          color: AppConfig.colorPrimary.withValues(alpha: 0.1),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -158,7 +159,7 @@ class _RutaDetalleScreenState extends State<RutaDetalleScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: const Color(0xFFC8D527).withValues(alpha: 0.2),
+          color: AppConfig.colorAccent.withValues(alpha: 0.2),
           shape: BoxShape.circle,
         ),
         child: Center(
@@ -166,7 +167,7 @@ class _RutaDetalleScreenState extends State<RutaDetalleScreen> {
             '${parada.orden}',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
-              color: Color(0xFF283C90),
+              color: AppConfig.colorPrimary,
             ),
           ),
         ),

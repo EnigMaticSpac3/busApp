@@ -1,6 +1,7 @@
 // lib/widgets/eta_banner.dart
 
 import 'package:flutter/material.dart';
+import '../config/app_config.dart';
 import '../models/eta_model.dart';
 
 class EtaBanner extends StatelessWidget {
@@ -46,9 +47,23 @@ class EtaBanner extends StatelessWidget {
   }
 
   Color get _colorFondo {
-    if (cargando || eta == null) return Colors.grey.shade300;
-    if (eta!.esFinDeRecorrido) return Colors.orange.shade200;
-    return const Color(0xFFE88D67);
+    if (cargando || eta == null) return AppConfig.surfaceSecondary;
+    if (eta!.esFinDeRecorrido) return AppConfig.surfaceWarning;
+    // ETA < 5 min → alerta (naranja), ETA normal → acento (lime)
+    if (_esEtaCorto) return AppConfig.surfaceWarning;
+    return AppConfig.surfaceSuccess;
+  }
+
+  bool get _esEtaCorto {
+    if (eta == null) return false;
+    final etaStr = eta!.eta.toLowerCase();
+    // Detecta "1 min", "2 min", "3 min", "4 min", "5 min" o "llegando"
+    final match = RegExp(r'(\d+)\s*min').firstMatch(etaStr);
+    if (match != null) {
+      final minutos = int.tryParse(match.group(1)!) ?? 999;
+      return minutos <= 5;
+    }
+    return etaStr.contains('llegando') || etaStr.contains('ahora');
   }
 
   IconData get _icono {

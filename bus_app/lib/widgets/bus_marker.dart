@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import '../config/app_config.dart';
 import '../models/bus_sesion_model.dart';
 
 /// Convierte una lista de buses en marcadores para FlutterMap.
@@ -45,7 +46,7 @@ class _BusMarkerWidget extends StatelessWidget {
                 ),
               ),
             ),
-          const Icon(Icons.directions_bus, color: Color(0xFFE88D67), size: 30),
+          const Icon(Icons.directions_bus, color: AppConfig.colorAccent, size: 30),
         ],
       ),
     );

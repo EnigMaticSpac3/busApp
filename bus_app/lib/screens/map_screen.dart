@@ -28,6 +28,7 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   final _api              = ApiService();
   final _crowdsourcing    = CrowdsourcingService();
+  final _mapController    = MapController();
 
   // Estado del mapa
   List<LatLng> _routePoints = [];
@@ -35,6 +36,7 @@ class _MapScreenState extends State<MapScreen> {
   EtaParada?   _eta;
   String?      _currentSessionId;
   LatLng?      _posicionUsuario;
+  bool         _mapaCentradoPorUsuario = true;
 
   // Estado de carga
   bool    _cargandoRuta = true;
@@ -134,6 +136,7 @@ class _MapScreenState extends State<MapScreen> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('ruta_id', ruta.rutaId);
 
+        if (!mounted) return;
         // Mostrar confirmación de subida
         await SubidaBusSheet.mostrar(
           context,
@@ -182,6 +185,13 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  void _centrarEnUsuario() {
+    if (_posicionUsuario != null) {
+      _mapController.move(_posicionUsuario!, _mapController.camera.zoom);
+      setState(() => _mapaCentradoPorUsuario = true);
+    }
+  }
+
   Future<void> _actualizarFlotaYEta() async {
     // Usar session_id del estado, o desde SharedPreferences como fallback
     final prefs = await SharedPreferences.getInstance();
@@ -209,7 +219,7 @@ class _MapScreenState extends State<MapScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('San Antonio Bus Tracker'),
-        backgroundColor: const Color(0xFF283C90),
+        backgroundColor: AppConfig.colorPrimary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -245,22 +255,44 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  /// Botón flotante para activar/desactivar la contribución GPS.
+  /// Botones flotantes: contribuir (principal) y centrar mapa (secundario)
   Widget _buildFab() {
     final activo   = _crowdsourcing.estaActivo;
     final ignorado = _crowdsourcing.estado == EstadoContribucion.ignorado;
     final busId    = _crowdsourcing.busAsignado;
 
-    return FloatingActionButton.extended(
-      onPressed: _toggleContribucion,
-      backgroundColor: activo ? const Color(0xFFC8D527) : const Color(0xFF283C90),
-      icon: Icon(activo ? Icons.location_on : Icons.location_off),
-      label: Text(
-        activo
-            ? (busId != null ? 'En $busId 🟢' : (ignorado ? 'Buscando bus...' : 'Contribuyendo 🟢'))
-            : 'Contribuir',
-        style: const TextStyle(fontWeight: FontWeight.bold),
-      ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        // Botón centrar en mi ubicación (aparece si el usuario movió el mapa)
+        if (!_mapaCentradoPorUsuario && _posicionUsuario != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: FloatingActionButton.small(
+              heroTag: 'centrar',
+              onPressed: _centrarEnUsuario,
+              backgroundColor: Colors.white,
+              child: Icon(Icons.my_location, color: AppConfig.colorPrimary),
+            ),
+          ),
+        // Botón contribuir
+        FloatingActionButton.extended(
+          heroTag: 'contribuir',
+          onPressed: _toggleContribucion,
+          backgroundColor: activo ? AppConfig.colorAccent : AppConfig.colorPrimary,
+          icon: Icon(
+            activo ? Icons.location_on : Icons.location_off,
+            color: activo ? AppConfig.colorPrimary : Colors.white,
+          ),
+          label: Text(
+            activo
+                ? (busId != null ? 'En $busId 🟢' : (ignorado ? 'Buscando bus...' : 'Contribuyendo 🟢'))
+                : 'Contribuir',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
     );
   }
 
@@ -291,9 +323,15 @@ class _MapScreenState extends State<MapScreen> {
     return Stack(
       children: [
         FlutterMap(
-          options: const MapOptions(
-            initialCenter: LatLng(9.0561, -79.4582),
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: const LatLng(9.0561, -79.4582),
             initialZoom: 15.0,
+            onPositionChanged: (position, hasGesture) {
+              if (hasGesture) {
+                setState(() => _mapaCentradoPorUsuario = false);
+              }
+            },
           ),
           children: [
             TileLayer(
@@ -304,8 +342,8 @@ class _MapScreenState extends State<MapScreen> {
               polylines: [
                 Polyline(
                   points: _routePoints,
-                  color: const Color(0xFFC8D527).withOpacity(0.6),
-                  strokeWidth: 4,
+                  color: AppConfig.colorPrimary.withValues(alpha: 0.6),
+                  strokeWidth: 5,
                 ),
               ],
             ),
