@@ -11,7 +11,11 @@ busApp/
 ├── bus_app/            # Flutter frontend
 │   └── lib/
 │       ├── main.dart
-│       ├── screens/map_screen.dart
+│       ├── screens/
+│       │   ├── home_screen.dart
+│       │   ├── map_screen.dart
+│       │   ├── rutas_screen.dart
+│       │   └── ruta_detalle_screen.dart
 │       ├── services/
 │       │   ├── api_service.dart
 │       │   └── crowdsourcing_service.dart
@@ -20,50 +24,53 @@ busApp/
 │       │   ├── crowdsourcing_sheet.dart
 │       │   ├── subida_bus_sheet.dart
 │       │   └── eta_banner.dart
-│       └── config/app_config.dart
-└── .agents/            # Agent definitions
+│       └── models/
+│           ├── bus_sesion_model.dart
+│           ├── ruta_model.dart
+│           └── parada_model.dart
+└── .opencode/agents/    # Agent definitions
     ├── backend_engineer.md
     ├── frontend_developer.md
     ├── devops_agent.md
-    ├── git-flow-guide.md
-    └── create-branch.sh
+    └── git-flow-guide.md
 ```
 
-## Quick Wins - Estado (v2 COMPLETO ✅)
+## Estado del Proyecto
 
-### ✅ Completados v2
+| Versión | Estado | Descripción |
+|---------|--------|-------------|
+| **v1** | ✅ Deprecated | Mapa básico, ruta E598, simulación GPS |
+| **v2** | ✅ Estable | Sesiones dinámicas, crowdsourcing real, validado en campo |
+| **v3** | ✅ Completado | Menú de rutas, ubicación usuario, NavigationBar |
+| **v4** | 🔄 En desarrollo | WebSocket, animaciones, múltiples rutas |
+
+---
+
+### ✅ Completados v3
 | # | Rama | Descripción | Fecha |
 |---|------|-------------|-------|
-| 1 | `chore/devops-*` | Multi-stage Docker | 2025-05-02 |
-| 2 | `feat/frontend-*` | Paleta corporativa (#283C90, #C8D527, #E88D67) | 2025-05-02 |
-| 3 | `fix/backend-*` | precision_m filter (>50m) | 2025-05-02 |
-| 4 | `fix/backend-*` | Velocidad máxima 22→16 m/s | 2025-05-02 |
-| 5 | `refactor/backend-*` | Eliminar simulación, crear sesiones dinámicas | 2025-05-03 |
-| 6 | `feat/backend-*` | Sesión bus dinámica (POST /api/iniciar-sesion-bus) | 2025-05-03 |
-| 7 | `feat/backend-*` | Contribución por sesión con session_id | 2025-05-03 |
-| 8 | `feat/backend-*` | Flota desde sesiones activas | 2025-05-03 |
-| 9 | `feat/backend-*` | Monitor de sesiones (geofencing backend) | 2025-05-03 |
-| 10 | `feat/backend-*` | Ruta con 1730 puntos para geofencing | 2025-05-03 |
-| 11 | `feat/frontend-*` | Modelo BusSesion con modo y opacidad | 2025-05-03 |
-| 12 | `feat/frontend-*` | Marcador dinámico con incertidumbre | 2025-05-03 |
-| 13 | `feat/frontend-*` | Confirmación de subida al bus | 2025-05-03 |
-| 14 | `feat/frontend-*` | Geofencing local para salida de ruta | 2025-05-03 |
-| 15 | `feat/frontend-*` | Mensaje cuando no hay buses activos | 2025-05-03 |
-| 16 | `fix/frontend-*` | Integración con backend v2 - payloads con sessionId/rutaId | 2025-05-03 |
-| 17 | `fix/frontend-*` | Debug logs y corregir eta_banner para usar session_id real | 2025-05-03 |
+| 1 | `feat/backend-*` | GET /api/rutas - lista de rutas desde GTFS | 2025-05-03 |
+| 2 | `feat/backend-*` | GET /api/rutas/{ruta_id}/paradas - paradas ordenadas | 2025-05-03 |
+| 3 | `feat/frontend-*` | NavigationBar con tabs Mapa y Rutas | 2025-05-03 |
+| 4 | `feat/frontend-*` | RutasScreen con pull-to-refresh | 2025-05-03 |
+| 5 | `feat/frontend-*` | RutaDetalleScreen con lista de paradas | 2025-05-03 |
+| 6 | `feat/frontend-*` | Ubicación del usuario en el mapa (punto azul) | 2025-05-03 |
+| 7 | `feat/frontend-*` | Botón centrar en mi ubicación (FAB) | 2025-05-03 |
+| 8 | `fix/frontend-*` | Corregir parsing API - wrapper rutas/paradas | 2025-05-03 |
+| 9 | `feat/frontend-*` | Flow de selección de ruta antes de contribuir | 2025-05-03 |
+| 10 | `feat/frontend-*` | Conectar tap en parada con mapa centrado | 2025-05-03 |
 
-### 🔜 En Progreso (v3)
-- HomeScreen + NavigationBar (Mapa/Rutas)
-- Endpoint GET /api/rutas (backend)
-- Endpoint GET /api/rutas/{ruta_id}/paradas (backend)
-- Ubicación del usuario en el mapa
-- Botón centrar en mi ubicación
+### 🔜 En Progreso (v4)
+- WebSocket /ws/flota para tiempo real
+- Animación suave de marcadores
+- Soporte múltiples rutas GTFS
 
-### ⬜ Pendientes (v4)
-- WebSocket para tiempo real
-- PostGIS con persistencia
-- Múltiples rutas
+### ⬜ Pendientes (v5)
+- PostGIS con persistencia de trayectorias
 - Modo conductor oficial
+- Deployment producción
+
+---
 
 ## How to Run
 
@@ -72,27 +79,26 @@ busApp/
 cd backend_bus_app
 docker-compose up --build
 # API: http://localhost:8000
+# Docs: http://localhost:8000/docs
 ```
 
 ### Frontend
 ```bash
 cd bus_app
-flutter build apk --debug  # Para Android
+flutter build apk --debug  # Android
 # O
-flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8080
+flutter run -d chrome     # Web
 ```
 
-## Nuevo Flujo v2 (Confirmación de Usuario)
+## Flujo de Usuario v3
 
 ```
-1. Usuario toca "Estoy en el bus"
-2. App muestra: "¿Subiste al bus E598?" [Sí] [Todavía no]
-3. Si confirma → POST /api/iniciar-sesion-bus → recibe session_id
-4. GPS activo → envía cada 5s con session_id
-5. Backend fusiona múltiples contribuidores (promedio GPS)
-6. Geofencing detecta si usuario sale de la ruta → detiene contribución
-7. Si no hay señal >5 min → bus pasa a modo "incierto"
-8. Si no hay señal >10 min → bus desaparece del mapa
+1. Abrir app → HomeScreen con NavigationBar
+2. Tab Mapa: Ver ruta y buses en tiempo real
+3. Tab Rutas: Ver lista de rutas disponibles
+4. Tocar ruta → Ver paradas en orden
+5. Tocar parada → Mapa centrado en esa parada
+6. Tocar "Estoy en el bus" → Selección de ruta → Contribuir GPS
 ```
 
 ## Critical Configurations
@@ -123,9 +129,11 @@ cd bus_app && flutter build apk --debug
 
 # Test API
 curl http://localhost:8000/api/flota
-curl -X POST http://localhost:8000/api/iniciar-sesion-bus \
-  -H "Content-Type: application/json" \
-  -d '{"usuario_id":"test","ruta_id":"SA_R1"}'
+curl http://localhost:8000/api/rutas
+curl http://localhost:8000/api/rutas/SA_INTERNAL/paradas
+
+# Test WebSocket (cuando esté implementado)
+wscat -c ws://localhost:8000/ws/flota
 ```
 
 ## Skills Instaladas
@@ -136,10 +144,24 @@ curl -X POST http://localhost:8000/api/iniciar-sesion-bus \
 
 ## Multi-Agent Workflow
 ```bash
-# Crear rama
-./.opencode/agents/create-branch.sh [frontend|backend|devops] "descripcion"
+# Crear rama desde develop
+git checkout develop && git pull
+git checkout -b feat/backend-nombre-tarea
 
 # Activar agente
 opencode
-# Pegar prompt de activación
+
+# Commit y push
+git commit -m "feat(backend): descripción"
+git push -u origin feat/backend-nombre-tarea
+```
+
+## Git Flow
+
+```
+main (producción) ← v1, v2, v3 ✅
+  ↑
+develop (integración) ← v4 activo
+  ↑
+feat/frontend-*   feat/backend-*   chore/devops-*
 ```

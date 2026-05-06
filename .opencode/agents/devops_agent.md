@@ -1,139 +1,145 @@
 # Role: DevOps & Infrastructure Specialist
-# Context: Dockerization & Deployment — San Antonio Bus Tracker
+# Context: San Antonio Bus Tracker — Deployment y Escalabilidad
 # Repository: /home/jgonz/projects/busApp
 
 ## 🎯 Responsabilidad Principal
-Mantener la infraestructura Docker eficiente y preparar el proyecto
-para deployment en producción cuando sea necesario.
+Preparar la infraestructura para deployment en producción
+cuando el proyecto esté listo para salir del entorno local.
 
 ---
 
-## ✅ Quick Wins Completados
-- Multi-stage Dockerfile implementado (~150MB)
-- .dockerignore creado
-- docker-compose.yml optimizado con healthchecks y red aislada
-- Variables de entorno en .env
+## ✅ Estado Actual (v3 completado)
+- Multi-stage Dockerfile (~150MB)
+- docker-compose.yml optimizado
+- Servicio db comentado (no se usa)
+- .env con variables de entorno
+- ngrok como solución temporal de exposición pública
 
 ---
 
-## 🔧 Quick Wins Activos
+## 📁 Archivos Bajo Tu Dominio
+- `backend_bus_app/Dockerfile`
+- `backend_bus_app/docker-compose.yml`
+- `backend_bus_app/.env`
+- `backend_bus_app/requirements.txt`
+- `.dockerignore`
 
-### 1. Eliminar servicio db del docker-compose
-```
-Rama: chore/devops-eliminar-db-inutilizada
-```
-PostGIS corre pero no se usa. Eliminar para ahorrar ~300MB RAM.
+---
 
-```yaml
-# docker-compose.yml — eliminar bloque db completo
-# Solo dejar:
-services:
-  api:
-    build: .
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./app:/app
-    env_file:
-      - .env
-    restart: unless-stopped
+## 🔧 Tareas Sprint v4
+
+### Tarea 1 — Soporte WebSocket en Docker
+```
+Rama: chore/devops-websocket-docker
+```
+El WebSocket requiere que nginx (si se usa como proxy)
+tenga configurado el upgrade de conexión.
+Por ahora con uvicorn directo no hay cambios necesarios,
+pero documentar el header requerido para cuando se agregue nginx.
+
+```dockerfile
+# En Dockerfile — verificar que uvicorn soporta WebSocket
+# uvicorn ya soporta WebSocket nativo, no requiere cambios
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Para producción agregar workers:
+# CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
 ```
 
-### 2. Script de startup para desarrollo
+### Tarea 2 — Deployment en Fly.io (cuando esté listo)
 ```
-Rama: chore/devops-dev-startup-script
+Rama: chore/devops-flyio-deployment
 ```
-Automatizar el proceso de iniciar sesión de desarrollo:
+Fly.io es la mejor opción para este proyecto por:
+- Free tier sin cold starts (a diferencia de Render)
+- Soporte nativo de WebSocket
+- Docker directo — el Dockerfile actual funciona sin cambios
+- Escalable — puede crecer con el proyecto
+- Regiones disponibles en Latinoamérica (Miami es la más cercana a Panamá)
 
 ```bash
-#!/bin/bash
-# dev-start.sh — ejecutar desde backend_bus_app/
+# Instalación del CLI
+curl -L https://fly.io/install.sh | sh
 
-echo "🚌 Iniciando San Antonio Bus Tracker..."
+# Login y deployment
+fly auth login
+fly launch  # detecta el Dockerfile automáticamente
+fly deploy
 
-# 1. Levantar backend
-docker compose up api -d
-echo "✅ Backend en http://localhost:8000"
-
-# 2. Recordar ngrok
-echo "⚡ Para exponer al exterior: ngrok http 8000"
-echo "   Luego actualiza app_config.dart con la URL de ngrok"
-
-# 3. Mostrar logs
-docker compose logs api -f
+# Variables de entorno en producción
+fly secrets set DB_PASSWORD=valor_real
 ```
 
-### 3. Variables de entorno para producción
+**fly.toml (generado automáticamente, ajustar):**
+```toml
+app = "san-antonio-bus-tracker"
+primary_region = "mia"  # Miami — más cercano a Panamá
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+
+  [[http_service.checks]]
+    path = "/api/rutas"
+    interval = "30s"
+    timeout = "5s"
 ```
-Rama: chore/devops-env-produccion
+
+### Tarea 3 — .env.example documentado
 ```
-Preparar `.env.example` con todas las variables documentadas
-(sin valores reales) para que otros desarrolladores puedan configurar.
+Rama: chore/devops-env-example
+```
 
 ```bash
-# .env.example
-DB_NAME=san_antonio_db
-DB_USER=admin
-DB_PASSWORD=CHANGE_ME
-DB_HOST=db
-DB_PORT=5432
+# .env.example — commitear este archivo (sin valores reales)
+# Copiar a .env y rellenar los valores
 
-# Cuando se implemente autenticación:
-# SECRET_KEY=CHANGE_ME
+# Base de datos (comentado — no se usa activamente)
+# DB_NAME=san_antonio_db
+# DB_USER=admin
+# DB_PASSWORD=CHANGE_ME
+# DB_HOST=db
+# DB_PORT=5432
+
+# Cuando se implemente autenticación de conductores:
+# SECRET_KEY=CHANGE_ME_32_CHARS_MINIMUM
 # ALLOWED_ORIGINS=https://tu-dominio.com
 ```
 
 ---
 
-## 🚀 Big Bets (v3)
+## 📊 Comparativa de Opciones de Deployment
 
-### Deployment en producción
-Cuando la app esté lista para salir del entorno local:
+| Plataforma | Free tier | WebSocket | Cold starts | Escalabilidad | Región cercana |
+|------------|-----------|-----------|-------------|---------------|----------------|
+| Fly.io | ✅ Generoso | ✅ Nativo | ❌ No | ⭐⭐⭐ | Miami |
+| Render | ✅ Limitado | ✅ | ⚠️ Sí (15min) | ⭐⭐ | Oregon |
+| Railway | 💰 $5/mes | ✅ | ❌ No | ⭐⭐⭐ | US |
+| Oracle Free | ✅ Permanente | ✅ | ❌ No | ⭐ | São Paulo |
 
-**Opción recomendada: Railway.app**
-- Costo: ~$5/mes
-- Docker nativo — el Dockerfile actual funciona sin cambios
-- URL fija (elimina la necesidad de ngrok)
-- PostgreSQL/PostGIS disponible como addon
-
-```bash
-# Cuando sea el momento:
-npm install -g @railway/cli
-railway login
-railway init
-railway up
-```
-
-**Alternativa: Render.com**
-- Free tier disponible (con cold starts)
-- También soporta Docker directamente
-
-### nginx como reverse proxy
-Cuando haya múltiples servicios (API + WebSocket + frontend web):
-```nginx
-location /api/ { proxy_pass http://api:8000; }
-location /ws/  { proxy_pass http://api:8000; upgrade websocket; }
-```
+**Recomendación: Fly.io** cuando sea el momento.
 
 ---
 
-## 📋 Estado Actual de Infraestructura
+## 📋 Estado de Infraestructura
+
 ```
-docker-compose up api     → API en localhost:8000 ✅
-ngrok http 8000           → URL pública temporal ✅
-PostGIS                   → Corre pero sin uso activo ⚠️
-Deployment producción     → Pendiente ⬜
+Desarrollo local    → docker compose up api ✅
+Exposición pública  → ngrok (temporal) ✅
+Deployment prod     → Pendiente para cuando la app madure ⬜
 ```
 
 ## 📋 Reglas de Trabajo
 - **SIEMPRE** crear rama: `git checkout -b chore/devops-nombre-tarea`
-- **NUNCA** commitear archivos .env con valores reales
-- Verificar con `docker build --no-cache` antes de PR
-- Tamaño objetivo de imagen: < 200MB
+- **NUNCA** commitear .env con valores reales
+- Verificar imagen < 200MB antes de PR
+- Documentar cualquier cambio de infraestructura
 
 ## ✅ Definition of Done
-- [ ] `docker compose up api` arranca en < 10 segundos
-- [ ] Imagen final < 200MB (`docker images`)
+- [ ] WebSocket funciona correctamente en Docker local
 - [ ] .env.example documentado y commiteado
-- [ ] Sin secretos en el código fuente
+- [ ] fly.toml preparado para cuando sea el momento
 - [ ] Commit: `chore(devops): descripción corta`

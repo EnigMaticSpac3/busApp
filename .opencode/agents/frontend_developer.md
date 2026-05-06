@@ -3,28 +3,26 @@
 # Repository: /home/jgonz/projects/busApp
 
 ## 🎯 Responsabilidad Principal
-Implementar navegación con BottomNavigationBar, menú de rutas,
-lista de paradas, y ubicación del usuario en el mapa.
+Implementar WebSocket para reemplazar polling, animación suave
+de marcadores, y soporte de múltiples rutas en la UI.
 
 ---
 
-## ✅ Estado Actual (v2 completado)
-- Mapa con ruta E598 dibujada
-- Buses dinámicos con opacidad según modo (activo/incierto/perdido)
-- Bottom sheet "¿Subiste al E598?"
-- Contribución GPS con session_id
-- Geofencing local para detectar salida de ruta
-- Mensaje "No hay buses activos"
+## ✅ Estado Actual (v3 completado)
+- BottomNavigationBar con tabs Mapa y Rutas
+- RutasScreen con lista desde API
+- RutaDetalleScreen con paradas
+- Tap en parada → mapa centrado
+- Punto azul con ubicación del usuario
+- Botón centrar en ubicación
+- Buses con opacidad según modo (activo/incierto/perdido)
+- Contribución GPS con session_id y geofencing
 
 ---
 
 ## 📁 Archivos Bajo Tu Dominio
-- `bus_app/lib/main.dart`
-- `bus_app/lib/screens/`
-- `bus_app/lib/config/app_config.dart`
-- `bus_app/lib/services/`
-- `bus_app/lib/widgets/`
-- `bus_app/lib/models/`
+- `bus_app/lib/` — todos los archivos Flutter
+- **NUNCA** modificar `backend_bus_app/`
 
 ---
 
@@ -36,229 +34,216 @@ lista de paradas, y ubicación del usuario en el mapa.
 | Bus activo | #E88D67 sólido |
 | Bus incierto | #E88D67 50% opacidad |
 | Bus perdido | #E88D67 20% opacidad |
+| Usuario | Azul sólido |
 | FAB contribuir activo | #C8D527 |
 | FAB contribuir inactivo | #283C90 |
 
 ---
 
-## 🔧 Tareas Sprint v3
+## 🔧 Tareas Sprint v4
 
-### Tarea 1 — BottomNavigationBar + HomeScreen
+### Tarea 1 — WebSocket para flota en tiempo real
 ```
-Rama: feat/frontend-navigation-bar
+Rama: feat/frontend-websocket-flota
 ```
-Crear `home_screen.dart` como contenedor principal con dos tabs.
-`map_screen.dart` y `rutas_screen.dart` se convierten en tabs.
+Reemplazar el polling de `_actualizarFlotaYEta()` con una
+conexión WebSocket persistente al endpoint `ws://backend/ws/flota`.
 
-**Estructura:**
+**Nuevo servicio:**
 ```dart
-// lib/screens/home_screen.dart
-class HomeScreen extends StatefulWidget { ... }
+// lib/services/websocket_service.dart
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
-class _HomeScreenState extends State<HomeScreen> {
-  int _tabIndex = 0;
+class WebSocketService extends ChangeNotifier {
+  WebSocketChannel? _channel;
+  List<BusSesion> _flota = [];
+  bool _conectado = false;
 
-  final List<Widget> _tabs = [
-    const MapScreen(),
-    const RutasScreen(),
-  ];
+  List<BusSesion> get flota => _flota;
+  bool get conectado => _conectado;
+
+  void conectar(String wsUrl) {
+    _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+    _conectado = true;
+
+    _channel!.stream.listen(
+      (mensaje) {
+        final data = jsonDecode(mensaje as String) as Map<String, dynamic>;
+        if (data['tipo'] == 'flota') {
+          _flota = (data['datos'] as List)
+              .map((j) => BusSesion.fromJson(j as Map<String, dynamic>))
+              .toList();
+          notifyListeners();
+        }
+      },
+      onError: (_) => _reconectar(wsUrl),
+      onDone: ()  => _reconectar(wsUrl),
+    );
+  }
+
+  void _reconectar(String wsUrl) {
+    _conectado = false;
+    notifyListeners();
+    // Reconectar tras 3 segundos
+    Future.delayed(const Duration(seconds: 3), () => conectar(wsUrl));
+  }
+
+  void desconectar() {
+    _channel?.sink.close();
+    _conectado = false;
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: _tabs[_tabIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tabIndex,
-        onDestinationSelected: (i) => setState(() => _tabIndex = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.map_outlined),
-            selectedIcon: Icon(Icons.map),
-            label: 'Mapa',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.directions_bus_outlined),
-            selectedIcon: Icon(Icons.directions_bus),
-            label: 'Rutas',
-          ),
-        ],
-      ),
-    );
+  void dispose() {
+    desconectar();
+    super.dispose();
   }
 }
 ```
 
-**Actualizar `main.dart`:**
+**Agregar a pubspec.yaml:**
+```yaml
+web_socket_channel: ^2.4.0
+```
+
+**Fallback HTTP** — si WebSocket falla tras 3 reconexiones,
+volver al polling HTTP como respaldo.
+
+**En map_screen.dart:**
+- Eliminar `_pollingTimer` para la flota
+- Escuchar `WebSocketService` via `ChangeNotifier`
+- Mantener polling solo para ETA (no tiene WebSocket aún)
+
+### Tarea 2 — Animación suave de marcadores
+```
+Rama: feat/frontend-animacion-marcadores
+```
+Los marcadores de buses actualmente "saltan" entre posiciones.
+Interpolación lineal entre la posición anterior y la nueva
+para movimiento fluido.
+
 ```dart
-home: const HomeScreen(),  // antes era MapScreen
-```
+// lib/widgets/bus_marker_animated.dart
 
-### Tarea 2 — Modelo RutaModel
-```
-Rama: feat/frontend-modelo-ruta
-```
+class BusMarkerAnimated extends StatefulWidget {
+  final BusSesion bus;
+  const BusMarkerAnimated({super.key, required this.bus});
 
-```dart
-// lib/models/ruta_model.dart
-class RutaModel {
-  final String rutaId;
-  final String codigo;      // "E598"
-  final String nombre;
-  final String color;
-  final int busesActivos;
+  @override
+  State<BusMarkerAnimated> createState() => _BusMarkerAnimatedState();
+}
 
-  const RutaModel({...});
+class _BusMarkerAnimatedState extends State<BusMarkerAnimated>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _latAnim;
+  late Animation<double> _lonAnim;
 
-  factory RutaModel.fromJson(Map<String, dynamic> json) => RutaModel(
-    rutaId:       json['ruta_id'] as String,
-    codigo:       json['codigo'] as String,
-    nombre:       json['nombre'] as String,
-    color:        json['color'] as String? ?? '007BFF',
-    busesActivos: json['buses_activos'] as int? ?? 0,
-  );
+  LatLng _posAnterior = const LatLng(0, 0);
+  LatLng _posActual   = const LatLng(0, 0);
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _posActual = LatLng(widget.bus.lat, widget.bus.lon);
+  }
+
+  @override
+  void didUpdateWidget(BusMarkerAnimated old) {
+    super.didUpdateWidget(old);
+    final nueva = LatLng(widget.bus.lat, widget.bus.lon);
+    if (nueva != _posActual) {
+      _posAnterior = _posActual;
+      _posActual   = nueva;
+      _latAnim = Tween(begin: _posAnterior.latitude,  end: _posActual.latitude)
+          .animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+      _lonAnim = Tween(begin: _posAnterior.longitude, end: _posActual.longitude)
+          .animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, __) {
+        // Actualizar posición del marcador en el mapa
+        // mediante callback o provider
+        return const SizedBox.shrink();
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 }
 ```
 
-### Tarea 3 — RutasScreen (lista de rutas)
+**Nota:** La animación en flutter_map requiere reconstruir
+el `MarkerLayer` con la posición interpolada. Usar
+`AnimatedBuilder` + `setState` en `map_screen.dart`.
+
+### Tarea 3 — Selector de ruta en contribución
 ```
-Rama: feat/frontend-rutas-screen
+Rama: feat/frontend-selector-ruta-contribucion
 ```
-Lista de rutas disponibles desde `GET /api/rutas`.
-Al tocar una ruta → navega a `RutaDetalleScreen`.
+Cuando el usuario toca "Estoy en el bus", mostrar qué ruta
+va a contribuir. Ahora que puede haber múltiples rutas,
+el usuario debe confirmar en cuál va.
 
 ```dart
-// lib/screens/rutas_screen.dart
-// - ListView con una card por ruta
-// - Muestra: código (E598), nombre, buses activos
-// - Badge verde si hay buses activos, gris si no
-// - Pull to refresh
-```
+// Modificar subida_bus_sheet.dart:
+// Agregar dropdown o lista de rutas disponibles
+// antes de confirmar la subida
 
-**Card de ruta:**
-```
-┌────────────────────────────────┐
-│  E598                    🟢 2  │
-│  San Antonio — Enlace Metro    │
-│  ──────────────────────── →   │
-└────────────────────────────────┘
-```
-
-### Tarea 4 — RutaDetalleScreen (lista de paradas)
-```
-Rama: feat/frontend-ruta-detalle-screen
-```
-Lista ordenada de paradas desde `GET /api/rutas/{ruta_id}/paradas`.
-Al tocar una parada → navega al mapa centrado en esa parada.
-
-```dart
-// lib/screens/ruta_detalle_screen.dart
-// - AppBar con nombre de la ruta (E598)
-// - ListView con paradas en orden
-// - Ícono de parada, nombre
-// - Al tocar → Navigator.push(MapScreen centrado en esa parada)
-```
-
-**Item de parada:**
-```
-🚏 Metro San Antonio
-🚏 Entrada San Antonio
-🚏 Academia Bil. San Antonio
-   ...
-```
-
-### Tarea 5 — Ubicación del usuario en el mapa
-```
-Rama: feat/frontend-ubicacion-usuario
-```
-Mostrar la posición del usuario como un marcador especial en el mapa.
-Usar `geolocator` (ya instalado) para obtener la posición en tiempo real.
-
-```dart
-// En map_screen.dart:
-// - Stream de posición del usuario
-// - Marcador azul con círculo de precisión
-// - Actualizar cada vez que cambia la posición
-
-// Marcador usuario:
-Marker(
-  point: _posicionUsuario,
-  child: Container(
-    decoration: BoxDecoration(
-      color: Colors.blue,
-      shape: BoxShape.circle,
-      border: Border.all(color: Colors.white, width: 2),
-    ),
-    width: 16, height: 16,
-  ),
-)
-```
-
-### Tarea 6 — Botón "centrar en mi ubicación"
-```
-Rama: feat/frontend-boton-centrar-ubicacion
-```
-Botón flotante secundario que centra el mapa en la posición del usuario.
-Cuando el usuario mueve el mapa, el botón aparece para volver a centrarse.
-
-```dart
-// En map_screen.dart:
-// - MapController de flutter_map para mover el mapa programáticamente
-// - FAB secundario con ícono Icons.my_location
-// - Al tocar → mapController.move(_posicionUsuario, zoom actual)
-// - Aparece solo cuando el centro del mapa está lejos del usuario
-
-FloatingActionButton(
-  heroTag: 'centrar',
-  mini: true,
-  onPressed: _centrarEnUsuario,
-  child: const Icon(Icons.my_location),
-)
+// Si solo hay una ruta (E598) → seleccionar automáticamente
+// Si hay múltiples → mostrar lista para elegir
 ```
 
 ---
 
-## 🗂️ Estructura de Archivos al Terminar v3
+## 🗂️ Archivos Nuevos en v4
 
 ```
 lib/
-  main.dart
-  config/
-    app_config.dart
-  models/
-    bus_sesion_model.dart    ✅ v2
-    contribucion_model.dart  ✅ v2
-    eta_model.dart           ✅ v1
-    ruta_model.dart          ← NUEVO v3
-    parada_model.dart        ← NUEVO v3
-  screens/
-    home_screen.dart         ← NUEVO v3
-    map_screen.dart          ✅ v2
-    rutas_screen.dart        ← NUEVO v3
-    ruta_detalle_screen.dart ← NUEVO v3
   services/
-    api_service.dart         ← actualizar con fetchRutas() y fetchParadas()
-    crowdsourcing_service.dart ✅ v2
+    websocket_service.dart      ← NUEVO
   widgets/
-    bus_marker.dart          ✅ v2
-    eta_banner.dart          ✅ v1
-    crowdsourcing_sheet.dart ✅ v1
-    subida_bus_sheet.dart    ✅ v2
+    bus_marker_animated.dart    ← NUEVO
 ```
+
+---
+
+## 📋 Orden de Implementación Recomendado
+
+1. **WebSocket primero** — es el cambio más impactante y
+   afecta la arquitectura del resto
+2. **Animación después** — depende de tener datos fluidos del WebSocket
+3. **Selector de ruta** — independiente, puede hacerse en paralelo
 
 ---
 
 ## 📋 Reglas de Trabajo
 - **SIEMPRE** crear rama: `git checkout -b feat/frontend-nombre-tarea`
-- **NUNCA** modificar archivos de `backend_bus_app/`
-- Seguir Material 3 con `NavigationBar` (no `BottomNavigationBar` legacy)
+- **NUNCA** modificar `backend_bus_app/`
+- Mantener polling HTTP como fallback del WebSocket
 - Probar en Chrome Y dispositivo físico antes de PR
 
 ## ✅ Definition of Done
-- [ ] `NavigationBar` con tabs Mapa y Rutas funciona
-- [ ] `RutasScreen` muestra E598 con buses activos
-- [ ] Toca E598 → lista de 28 paradas en orden
-- [ ] Toca parada → mapa centrado en esa parada
-- [ ] Punto azul muestra ubicación del usuario
-- [ ] Botón centra el mapa en el usuario
+- [ ] App recibe actualizaciones de flota sin polling
+- [ ] Indicador de conexión WebSocket visible en UI
+- [ ] Marcadores se mueven suavemente entre posiciones
+- [ ] Fallback a HTTP polling si WebSocket falla
 - [ ] Compila en Chrome y dispositivo físico
 - [ ] Commit: `feat(frontend): descripción corta`

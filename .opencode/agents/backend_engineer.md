@@ -3,17 +3,19 @@
 # Repository: /home/jgonz/projects/busApp
 
 ## 🎯 Responsabilidad Principal
-Mantener y extender la API FastAPI con nuevos endpoints para el sprint v3.
+Implementar WebSocket para tiempo real, soporte de múltiples rutas,
+y modo conductor oficial.
 
 ---
 
-## ✅ Estado Actual (v2 completado)
-- Modelo de sesiones dinámicas (`sesiones_activas` dict)
-- Endpoint `POST /api/iniciar-sesion-bus`
-- Endpoint `POST /api/contribuir-ubicacion` con promedio ponderado
-- Endpoint `GET /api/flota` con modo e incertidumbre
+## ✅ Estado Actual (v3 completado)
+- Sesiones dinámicas por ruta (`sesiones_activas` dict)
+- `POST /api/iniciar-sesion-bus` — sesión única por ruta
+- `POST /api/contribuir-ubicacion` — promedio ponderado
+- `GET /api/flota` — modo e incertidumbre
+- `GET /api/rutas` — lista desde GTFS
+- `GET /api/rutas/{ruta_id}/paradas` — paradas ordenadas
 - Monitor de sesiones con geofencing y limpieza automática
-- Sin motor de simulación — solo datos reales
 
 ---
 
@@ -25,87 +27,151 @@ Mantener y extender la API FastAPI con nuevos endpoints para el sprint v3.
 
 ---
 
-## 🔧 Tareas Sprint v3
+## 🔧 Tareas Sprint v4
 
-### Tarea 1 — Endpoint GET /api/rutas
+### Tarea 1 — WebSocket /ws/flota
 ```
-Rama: feat/backend-endpoint-rutas
+Rama: feat/backend-websocket-flota
 ```
-Lista todas las rutas disponibles leyendo del GTFS.
-Incluye cuántos buses activos tiene cada ruta en ese momento.
-
-```python
-@app.get("/api/rutas")
-async def get_rutas():
-    """
-    Lee routes.txt del GTFS y devuelve lista de rutas disponibles.
-    Incluye buses_activos calculado desde sesiones_activas.
-    """
-    rutas = leer_csv_gtfs("routes.txt")
-    async with _sesiones_lock:
-        resultado = []
-        for ruta in rutas:
-            ruta_id = ruta["route_id"]
-            buses_activos = 0
-            if ruta_id in sesiones_activas:
-                sesion = sesiones_activas[ruta_id]
-                ahora = time.time()
-                seg = ahora - sesion["ultimo_gps"]
-                if seg < 600:  # sesión no expirada
-                    buses_activos = sesion.get("contribuidores_activos", 0)
-
-            resultado.append({
-                "ruta_id":       ruta_id,
-                "codigo":        ruta["route_short_name"],  # "E598"
-                "nombre":        ruta["route_long_name"],
-                "color":         ruta.get("route_color", "007BFF"),
-                "buses_activos": buses_activos,
-            })
-    return resultado
-```
-
-### Tarea 2 — Endpoint GET /api/rutas/{ruta_id}/paradas
-```
-Rama: feat/backend-endpoint-paradas-por-ruta
-```
-Devuelve las paradas de una ruta en orden, con su posición
-en la secuencia del recorrido.
+Reemplazar el polling HTTP con una conexión WebSocket persistente.
+El servidor empuja actualizaciones a todos los clientes conectados
+cada vez que cambia el estado de la flota.
 
 ```python
-@app.get("/api/rutas/{ruta_id}/paradas")
-async def get_paradas_ruta(ruta_id: str):
+# Agregar a requirements.txt:
+# websockets (ya incluido en fastapi con uvicorn)
+
+from fastapi import WebSocket, WebSocketDisconnect
+from typing import List
+
+class ConnectionManager:
+    """Gestiona todas las conexiones WebSocket activas."""
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        log.info(f"WebSocket conectado. Total: {len(self.active_connections)}")
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+        log.info(f"WebSocket desconectado. Total: {len(self.active_connections)}")
+
+    async def broadcast(self, data: dict):
+        """Envía datos a todos los clientes conectados."""
+        if not self.active_connections:
+            return
+        import json
+        mensaje = json.dumps(data)
+        conexiones_muertas = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(mensaje)
+            except Exception:
+                conexiones_muertas.append(connection)
+        for conn in conexiones_muertas:
+            self.active_connections.remove(conn)
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/flota")
+async def websocket_flota(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        # Enviar estado actual al conectarse
+        flota_actual = await _get_flota_data()
+        await websocket.send_text(json.dumps(flota_actual))
+        # Mantener conexión abierta
+        while True:
+            await websocket.receive_text()  # esperar ping del cliente
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+```
+
+**Broadcast automático** — modificar `contribuir_ubicacion` para
+notificar a todos los clientes cuando cambia la posición:
+
+```python
+# Al final de contribuir_ubicacion, después de actualizar sesión:
+flota_actualizada = await _get_flota_data()
+await manager.broadcast({"tipo": "flota", "datos": flota_actualizada})
+```
+
+**Mantener /api/flota como fallback** — no eliminar el endpoint HTTP,
+el frontend lo usa como respaldo si WebSocket falla.
+
+### Tarea 2 — Soporte múltiples rutas GTFS
+```
+Rama: feat/backend-multiples-rutas
+```
+Cuando se agreguen nuevos archivos GTFS (M530, etc.), el backend
+debe cargarlos automáticamente sin cambios en el código.
+
+```python
+# Modificar cargar_ruta_desde_gtfs() para soportar múltiples shapes:
+def cargar_todas_las_rutas() -> dict[str, list]:
     """
-    Devuelve paradas ordenadas por secuencia para una ruta específica.
-    Lee stop_times.txt y stops.txt del GTFS.
+    Carga todos los shapes disponibles en el GTFS.
+    Devuelve dict: {shape_id: [puntos]}
     """
-    # Filtrar paradas del trip correspondiente a ruta_id
-    # Usar paradas_info ya cargado en memoria
-    paradas_ordenadas = sorted(
-        [p for p in paradas_info if True],  # filtrar por ruta_id cuando haya múltiples rutas
-        key=lambda p: p["indice_ruta"]
-    )
-    return {
-        "ruta_id": ruta_id,
-        "paradas": [
-            {
-                "stop_id":   p["stop_id"],
-                "nombre":    p["nombre"],
-                "lat":       p["lat"],
-                "lon":       p["lon"],
-                "secuencia": i,
-            }
-            for i, p in enumerate(paradas_ordenadas)
-        ]
+    shapes = leer_csv_gtfs("shapes.txt")
+    rutas = {}
+    for row in shapes:
+        shape_id = row["shape_id"]
+        if shape_id not in rutas:
+            rutas[shape_id] = []
+        rutas[shape_id].append({
+            "lat":       float(row["shape_pt_lat"]),
+            "lon":       float(row["shape_pt_lon"]),
+            "secuencia": int(row["shape_pt_sequence"]),
+            "dist":      float(row["shape_dist_traveled"]),
+        })
+    # Ordenar cada ruta por secuencia
+    for shape_id in rutas:
+        rutas[shape_id].sort(key=lambda p: p["secuencia"])
+    return rutas
+
+# En lifespan: cargar todas las rutas disponibles
+todas_las_rutas: dict[str, list] = {}  # {shape_id: [puntos]}
+```
+
+### Tarea 3 — Modo conductor oficial
+```
+Rama: feat/backend-modo-conductor
+```
+Los conductores registrados pueden contribuir con una etiqueta
+"oficial" que tiene más peso en el promedio ponderado.
+
+```python
+# Nuevo endpoint — registrar conductor (por ahora sin autenticación real)
+class RegistroConductor(BaseModel):
+    usuario_id: str
+    codigo_ruta: str   # "E598"
+    nombre:      str   # nombre del conductor (opcional)
+
+# Tabla en memoria (en v5 pasará a PostGIS)
+conductores_registrados: dict[str, dict] = {}
+
+@app.post("/api/conductor/registrar")
+async def registrar_conductor(payload: RegistroConductor):
+    conductores_registrados[payload.usuario_id] = {
+        "codigo_ruta": payload.codigo_ruta,
+        "nombre":      payload.nombre,
+        "registrado":  time.time(),
     }
+    return {"estado": "registrado", "usuario_id": payload.usuario_id}
+
+# En map_matching / contribuir_ubicacion:
+# Si usuario_id está en conductores_registrados → peso x3 en promedio
 ```
 
 ---
 
-## 🚀 Big Bets (v4)
-1. WebSocket `/ws/flota` — eliminar polling HTTP
-2. PostGIS — persistencia de trayectorias reales
-3. Soporte múltiples rutas con GTFS independientes
-4. Modo conductor oficial
+## 🚀 Big Bets (v5)
+- PostGIS — persistencia de trayectorias y conductores
+- Autenticación real para conductores (JWT)
+- API pública documentada para terceros
 
 ---
 
@@ -124,11 +190,12 @@ VENTANA_PROMEDIO_S      = 30
 ## 📋 Reglas de Trabajo
 - **SIEMPRE** crear rama: `git checkout -b tipo/backend-nombre-tarea`
 - **NUNCA** modificar archivos de `bus_app/`
-- Usar `_sesiones_lock` para todo acceso a `sesiones_activas`
+- Mantener `/api/flota` HTTP como fallback del WebSocket
 - Un endpoint por PR
 
 ## ✅ Definition of Done
-- [ ] `GET /api/rutas` devuelve E598 con buses_activos correcto
-- [ ] `GET /api/rutas/SA_R1/paradas` devuelve 28 paradas ordenadas
-- [ ] Ambos endpoints documentados en `/docs` de FastAPI
+- [ ] `ws://localhost:8000/ws/flota` acepta conexiones WebSocket
+- [ ] Clientes reciben push cuando cambia la flota
+- [ ] `/api/flota` HTTP sigue funcionando como fallback
+- [ ] Múltiples rutas cargan automáticamente desde GTFS
 - [ ] Commit: `feat(backend): descripción corta`

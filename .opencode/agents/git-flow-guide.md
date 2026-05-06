@@ -3,79 +3,52 @@
 ## 🌿 Estructura de Ramas
 
 ```
-main (producción — v2 estable validado en campo ✅)
+main (producción — v3 estable ✅)
   ↑ merge después de QA completo
   ↑
-develop (integración — sprint v3 activo)
-  ↑ merge después de code review
+develop (integración — sprint v4 activo)
   ↑
-feat/frontend-*     feat/backend-*     chore/devops-*
+feat/frontend-*   feat/backend-*   chore/devops-*
 ```
 
 ---
 
-## 📋 Nomenclatura de Ramas
+## 📋 Nomenclatura
 
 | Prefijo | Uso | Ejemplo |
 |---------|-----|---------|
-| `feat/` | Nueva funcionalidad | `feat/frontend-navigation-bar` |
-| `fix/` | Bug fix | `fix/backend-endpoint-rutas` |
-| `chore/` | Infraestructura | `chore/devops-comentar-db-docker` |
-| `refactor/` | Refactoring | `refactor/frontend-api-service` |
+| `feat/` | Nueva funcionalidad | `feat/backend-websocket-flota` |
+| `fix/` | Bug fix | `fix/frontend-websocket-reconexion` |
+| `chore/` | Infraestructura | `chore/devops-flyio-deployment` |
+| `refactor/` | Refactoring | `refactor/frontend-eliminar-polling` |
 
 ---
 
-## 🎯 Backlog Sprint v3 — Menú de Rutas + UX
+## 🎯 Backlog Sprint v4 — WebSocket + Animaciones + Escalabilidad
 
-### Fase 1 — Backend (bloqueante para frontend tabs 3 y 4)
+### Fase 1 — Backend (bloqueante para WebSocket frontend)
 
 | # | Rama | Descripción | Estado |
 |---|------|-------------|--------|
-| 1 | `feat/backend-endpoint-rutas` | GET /api/rutas — lista rutas desde GTFS con buses_activos | ⬜ |
-| 2 | `feat/backend-endpoint-paradas-por-ruta` | GET /api/rutas/{ruta_id}/paradas — paradas ordenadas | ⬜ |
+| 1 | `feat/backend-websocket-flota` | WebSocket /ws/flota con broadcast automático | ⬜ |
+| 2 | `feat/backend-multiples-rutas` | Soporte múltiples shapes GTFS simultáneos | ⬜ |
+| 3 | `feat/backend-modo-conductor` | Registro de conductores con peso x3 en promedio | ⬜ |
 
-### Fase 2 — Frontend (tareas 1-2 independientes, 3-4 dependen de backend)
+### Fase 2 — Frontend
 
 | # | Rama | Descripción | Depende de |
 |---|------|-------------|------------|
-| 3 | `feat/frontend-navigation-bar` | HomeScreen + BottomNavigationBar (Mapa/Rutas) | ninguna |
-| 4 | `feat/frontend-modelo-ruta` | RutaModel y ParadaModel | ninguna |
-| 5 | `feat/frontend-rutas-screen` | Lista de rutas con código y buses activos | Backend #1 + Frontend #3,#4 |
-| 6 | `feat/frontend-ruta-detalle-screen` | Lista de paradas, toca → mapa centrado | Backend #2 + Frontend #5 |
-| 7 | `feat/frontend-ubicacion-usuario` | Punto azul con posición del usuario en mapa | ninguna |
-| 8 | `feat/frontend-boton-centrar-ubicacion` | FAB que centra el mapa en el usuario | Frontend #7 |
+| 4 | `feat/frontend-websocket-flota` | WebSocketService + fallback HTTP | Backend #1 |
+| 5 | `feat/frontend-animacion-marcadores` | Interpolación suave entre posiciones GPS | #4 |
+| 6 | `feat/frontend-selector-ruta-contribucion` | Elegir ruta al contribuir (multi-ruta) | Backend #2 |
 
 ### Fase 3 — DevOps
 
-| # | Rama | Descripción |
-|---|------|-------------|
-| 9 | `chore/devops-comentar-db-docker` | Comentar servicio db en docker-compose |
-| 10 | `chore/devops-env-example` | Crear .env.example documentado |
-
----
-
-## 🚀 Flujo de Trabajo
-
-```bash
-# 1. Partir de develop actualizado
-git checkout develop
-git pull origin develop
-
-# 2. Crear rama
-git checkout -b feat/backend-endpoint-rutas
-
-# 3. Commits atómicos
-git add backend_bus_app/app/main.py
-git commit -m "feat(backend): agregar endpoint GET /api/rutas"
-
-# 4. Push y PR → develop
-git push -u origin feat/backend-endpoint-rutas
-
-# 5. Limpieza tras merge
-git checkout develop
-git pull origin develop
-git branch -d feat/backend-endpoint-rutas
-```
+| # | Rama | Descripción | Depende de |
+|---|------|-------------|------------|
+| 7 | `chore/devops-websocket-docker` | Verificar soporte WebSocket en Docker | Backend #1 |
+| 8 | `chore/devops-env-example` | .env.example documentado | ninguna |
+| 9 | `chore/devops-flyio-deployment` | fly.toml preparado para producción | ninguna |
 
 ---
 
@@ -84,28 +57,51 @@ git branch -d feat/backend-endpoint-rutas
 ```
 v1 ✅  Mapa básico, ruta E598, simulación GPS
 v2 ✅  Sesiones dinámicas, crowdsourcing real, validado en campo
-v3 🔄  Menú de rutas, ubicación usuario, navegación tabs (EN PROGRESO)
-v4 ⬜  WebSocket, PostGIS, múltiples rutas, modo conductor
+v3 ✅  Menú de rutas, ubicación usuario, navegación tabs
+v4 🔄  WebSocket, animaciones, múltiples rutas, modo conductor
+v5 ⬜  PostGIS, autenticación JWT, API pública, deployment prod
+```
+
+---
+
+## 🔄 Flujo de Trabajo
+
+```bash
+git checkout develop && git pull origin develop
+git checkout -b feat/backend-websocket-flota
+# ... trabajar ...
+git commit -m "feat(backend): implementar WebSocket /ws/flota"
+git push -u origin feat/backend-websocket-flota
+# PR → develop → merge
+git checkout develop && git pull
+git branch -d feat/backend-websocket-flota
 ```
 
 ---
 
 ## 🔒 Reglas de Oro
 
-1. **Una tarea por rama**
-2. **Commits atómicos**
-3. **Nunca push directo a main o develop**
-4. **Backend antes que frontend** cuando hay dependencias
-5. **Nunca commitear .env con valores reales**
-6. **Probar en Chrome Y dispositivo físico antes de PR**
+1. Una tarea por rama
+2. Backend WebSocket antes que frontend WebSocket
+3. Nunca push directo a main o develop
+4. Mantener /api/flota HTTP como fallback siempre
+5. Nunca commitear .env con valores reales
+6. Probar WebSocket con `wscat` antes del PR:
+   ```bash
+   # Instalar wscat para probar WebSocket desde terminal
+   npm install -g wscat
+   wscat -c ws://localhost:8000/ws/flota
+   ```
 
 ---
 
 ## 💬 Formato de Commits
 
 ```
-feat(backend): agregar endpoint GET /api/rutas
-feat(frontend): implementar NavigationBar con tabs Mapa/Rutas
-fix(frontend): corregir centrado de mapa en ubicación usuario
-chore(devops): comentar servicio db en docker-compose
+feat(backend): implementar WebSocket /ws/flota con broadcast
+feat(frontend): reemplazar polling con WebSocketService
+feat(frontend): animación suave de marcadores con interpolación
+feat(backend): soporte múltiples rutas GTFS simultáneas
+feat(backend): modo conductor con peso x3 en promedio ponderado
+chore(devops): preparar fly.toml para deployment en Fly.io
 ```
