@@ -49,6 +49,7 @@ class _MapScreenState extends State<MapScreen> {
   String?      _currentSessionId;
   LatLng?      _posicionUsuario;
   bool         _mapaCentradoPorUsuario = true;
+  Map<String, LatLng> _posicionesAnterioresBuses = {};
 
   // Estado de carga
   bool    _cargandoRuta = true;
@@ -214,6 +215,14 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _actualizarFlotaYEta() async {
+    // Guardar posiciones actuales ANTES de recibir nuevas para animación
+    final posicionesActuales = <String, LatLng>{};
+    for (final bus in _flota) {
+      if (bus.lat != 0 && bus.lon != 0) {
+        posicionesActuales[bus.sessionId] = LatLng(bus.lat, bus.lon);
+      }
+    }
+
     // Usar session_id del estado, o desde SharedPreferences como fallback
     final prefs = await SharedPreferences.getInstance();
     final sessionId = _currentSessionId ?? prefs.getString('session_id');
@@ -225,6 +234,7 @@ class _MapScreenState extends State<MapScreen> {
     ]);
     if (!mounted) return;
     setState(() {
+      _posicionesAnterioresBuses = posicionesActuales;
       _flota = resultados[0] as List<BusSesion>;
       _eta         = resultados[1] as EtaParada?;
       _cargandoEta = false;
