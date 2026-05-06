@@ -22,11 +22,11 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -48,6 +48,51 @@ GTFS_DIR = Path(__file__).parent / "gtfs_san_antonio"
 # IDs que usamos en nuestro feed GTFS
 SHAPE_ID = "SA_R1"
 TRIP_ID  = "SA_IDA_001"
+
+# ---------------------------------------------------------------------------
+# WebSocket - Connection Manager
+# ---------------------------------------------------------------------------
+
+class ConnectionManager:
+    """Gestiona todas las conexiones WebSocket activas."""
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        log.info(f"WebSocket conectado. Total: {len(self.active_connections)}")
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+            log.info(f"WebSocket desconectado. Total: {len(self.active_connections)}")
+
+    async def broadcast(self, data: dict):
+        """Envía datos a todos los clientes conectados."""
+        if not self.active_connections:
+            return
+        import json
+        mensaje = json.dumps(data)
+        conexiones_muertas = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(mensaje)
+            except Exception:
+                conexiones_muertas.append(connection)
+        for conn in conexiones_muertas:
+            if conn in self.active_connections:
+                self.active_connections.remove(conn)
+
+    async def send_personal(self, websocket: WebSocket, data: dict):
+        """Envía datos a un cliente específico."""
+        import json
+        try:
+            await websocket.send_text(json.dumps(data))
+        except Exception as e:
+            log.warning(f"Error enviando a cliente: {e}")
+
+manager = ConnectionManager()
 
 # ---------------------------------------------------------------------------
 # Estado compartido en memoria
@@ -357,34 +402,63 @@ async def get_paradas_ruta(ruta_id: str):
 async def get_flota():
     """Devuelve sesiones activas (buses dinámicos desde contribuidores)."""
     async with _sesiones_lock:
-        resultado = []
-        ahora = time.time()
-        for sesion in sesiones_activas.values():
-            seg = ahora - sesion["ultimo_gps"]
-            if seg > 600:  # 10 minutos → no mostrar
-                continue
-            modo = (
-                "activo"   if seg < 15 else
-                "incierto" if seg < 300 else
-                "perdido"
-            )
-            contribuidores_activos = sum(
-                1 for c in sesion["contribuidores"].values()
-                if ahora - c["ts"] < 30
-            )
-            resultado.append({
-                "bus_id":             f"Bus-{sesion['session_id']}",
-                "session_id":         sesion["session_id"],
-                "ruta_id":            sesion["ruta_id"],
-                "lat":                sesion["lat"],
-                "lon":                sesion["lon"],
-                "vel_ms":             sesion["vel_ms"],
-                "indice_ruta":        sesion.get("indice_ruta", 0),
-                "modo":               modo,
-                "segundos_sin_senal": round(seg, 0),
-                "contribuidores_activos": contribuidores_activos,
-            })
-        return resultado
+        return _get_flota_data()
+
+
+def _get_flota_data() -> list:
+    """Función helper para obtener datos de la flota."""
+    resultado = []
+    ahora = time.time()
+    for sesion in sesiones_activas.values():
+        seg = ahora - sesion["ultimo_gps"]
+        if seg > 600:
+            continue
+        modo = (
+            "activo"   if seg < 15 else
+            "incierto" if seg < 300 else
+            "perdido"
+        )
+        contribuidores_activos = sum(
+            1 for c in sesion["contribuidores"].values()
+            if ahora - c["ts"] < 30
+        )
+        resultado.append({
+            "bus_id":             f"Bus-{sesion['session_id']}",
+            "session_id":         sesion["session_id"],
+            "ruta_id":            sesion["ruta_id"],
+            "lat":                sesion["lat"],
+            "lon":                sesion["lon"],
+            "vel_ms":             sesion["vel_ms"],
+            "indice_ruta":        sesion.get("indice_ruta", 0),
+            "modo":               modo,
+            "segundos_sin_senal": round(seg, 0),
+            "contribuidores_activos": contribuidores_activos,
+        })
+    return resultado
+
+
+# WebSocket endpoint
+@app.websocket("/ws/flota")
+async def websocket_endpoint(websocket: WebSocket):
+    """
+    Endpoint WebSocket para tiempo real de la flota.
+    El cliente se conecta y recibe actualizaciones de la flota
+    cada vez que hay un cambio.
+    """
+    await manager.connect(websocket)
+    try:
+        # Enviar estado actual al conectarse
+        async with _sesiones_lock:
+            flota_actual = _get_flota_data()
+
+        await manager.send_personal(websocket, {"tipo": "flota", "datos": flota_actual})
+
+        # Mantener conexión abierta y escuchar mensajes (ping/pong)
+        while True:
+            await websocket.receive_text()
+
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 
 @app.get("/api/parada-cercana/{id_bus}")
@@ -625,6 +699,10 @@ async def contribuir_ubicacion(payload: UbicacionUsuario):
         sesion["ultimo_gps"] = ahora
         sesion["indice_ruta"] = map_result.get("indice_ruta", 0)
         sesion["modo"] = "activo"
+
+        # Broadcast a todos los clientes WebSocket
+        flota_actual = _get_flota_data()
+        await manager.broadcast({"tipo": "flota", "datos": flota_actual})
 
     log.info(
         f"Contribución aceptada: usuario={payload.usuario_id} "

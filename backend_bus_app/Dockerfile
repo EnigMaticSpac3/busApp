@@ -20,11 +20,11 @@ WORKDIR /app
 # Copy only installed packages from builder
 COPY --from=builder /install /usr/local
 
-# Copy only the app directory (not entire project)
-COPY app/ ./app/
+# Copy the app directory directly to /app
+COPY app/ .
 
 # Expose port
 EXPOSE 8000
 
-# Run the API (no --reload in production)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the API
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
