@@ -13,7 +13,6 @@ import '../models/eta_model.dart';
 import '../services/api_service.dart';
 import '../services/crowdsourcing_service.dart';
 import '../services/websocket_service.dart';
-import '../widgets/bus_marker.dart';
 import '../widgets/bus_marker_animated.dart';
 import '../widgets/crowdsourcing_sheet.dart';
 import '../widgets/eta_banner.dart';
