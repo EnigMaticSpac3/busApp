@@ -12,6 +12,7 @@ import '../models/bus_sesion_model.dart';
 import '../models/eta_model.dart';
 import '../services/api_service.dart';
 import '../services/crowdsourcing_service.dart';
+import '../services/websocket_service.dart';
 import '../widgets/bus_marker.dart';
 import '../widgets/crowdsourcing_sheet.dart';
 import '../widgets/eta_banner.dart';
@@ -38,6 +39,7 @@ class _MapScreenState extends State<MapScreen> {
   final _api              = ApiService();
   final _crowdsourcing    = CrowdsourcingService();
   final _mapController    = MapController();
+  late final WebSocketService _wsService;
 
   // Estado del mapa
   List<LatLng> _routePoints = [];
@@ -82,6 +84,8 @@ class _MapScreenState extends State<MapScreen> {
     _pollingTimer?.cancel();
     _locationSubscription?.cancel();
     _crowdsourcing.removeListener(_onCrowdsourcingChange);
+    _wsService.removeListener(_onWebSocketChange);
+    _wsService.dispose();
     _crowdsourcing.dispose();
     super.dispose();
   }
