@@ -14,6 +14,7 @@ import '../services/api_service.dart';
 import '../services/crowdsourcing_service.dart';
 import '../services/websocket_service.dart';
 import '../widgets/bus_marker.dart';
+import '../widgets/bus_marker_animated.dart';
 import '../widgets/crowdsourcing_sheet.dart';
 import '../widgets/eta_banner.dart';
 import '../widgets/seleccionar_ruta_sheet.dart';
@@ -84,7 +85,6 @@ class _MapScreenState extends State<MapScreen> {
     _pollingTimer?.cancel();
     _locationSubscription?.cancel();
     _crowdsourcing.removeListener(_onCrowdsourcingChange);
-    _wsService.removeListener(_onWebSocketChange);
     _wsService.dispose();
     _crowdsourcing.dispose();
     super.dispose();
@@ -370,7 +370,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
             MarkerLayer(
               markers: [
-                ...buildBusMarkers(_flota),
+                ...buildAnimatedBusMarkers(_flota, _posicionesAnterioresBuses),
                 if (_posicionUsuario != null)
                   Marker(
                     point: _posicionUsuario!,
