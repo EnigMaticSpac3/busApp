@@ -55,6 +55,12 @@ class _SeleccionarRutaSheetState extends State<SeleccionarRutaSheet> {
       _rutas = rutas;
       _cargando = false;
     });
+
+    // Si solo hay una ruta, seleccionarla automáticamente
+    if (_rutas.length == 1) {
+      widget.onRutaSeleccionada(_rutas.first);
+      if (mounted) Navigator.pop(context);
+    }
   }
 
   @override
