@@ -180,7 +180,7 @@ class _RutaDetalleScreenState extends State<RutaDetalleScreen> {
       ),
       trailing: const Icon(Icons.chevron_right, color: Colors.grey),
       onTap: () {
-        // TODO: navegar al mapa centrado en esta parada
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Ir a: ${parada.nombre}'),
