@@ -60,6 +60,9 @@ class _SubidaBusSheetState extends State<SubidaBusSheet> {
 
     const rutaId = 'SA_INTERNAL';
 
+    // Guardar ruta_id primero
+    await prefs.setString('ruta_id', rutaId);
+
     debugPrint('=== INICIAR SESIÓN ===');
     debugPrint('usuario_id: $usuarioId');
     debugPrint('ruta_id: $rutaId');
@@ -102,10 +105,9 @@ class _SubidaBusSheetState extends State<SubidaBusSheet> {
       return;
     }
 
-    // Guardar session_id y ruta_id en SharedPreferences
+    // Guardar session_id en SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('session_id', sessionId);
-    await prefs.setString('ruta_id', 'SA_R1');
     await prefs.setBool('contribuyendo', true);
 
     debugPrint('session_id guardado: $sessionId');
