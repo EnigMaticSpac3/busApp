@@ -50,6 +50,25 @@ SHAPE_ID = "SA_R1"
 TRIP_ID  = "SA_IDA_001"
 
 # ---------------------------------------------------------------------------
+# Conductores autorizados (MVP - gestión manual)
+# ---------------------------------------------------------------------------
+
+conductores_autorizados = {
+    "conductor_001": {
+        "nombre": "Juan Pérez",
+        "pin": "1234",
+        "ruta_asignada": "SA_INTERNAL",
+        "activo": True,
+    },
+    "conductor_002": {
+        "nombre": "María Gómez",
+        "pin": "5678",
+        "ruta_asignada": "SA_INTERNAL",
+        "activo": True,
+    },
+}
+
+# ---------------------------------------------------------------------------
 # WebSocket - Connection Manager
 # ---------------------------------------------------------------------------
 
@@ -541,6 +560,29 @@ async def iniciar_sesion_bus(payload: InicioSesion):
         }
         log.info(f"Nueva sesión {session_id} creada para ruta {payload.ruta_id}")
         return {"session_id": session_id, "nueva": True, "ruta_id": payload.ruta_id}
+
+
+class AuthConductor(BaseModel):
+    """Payload para autenticar conductor."""
+    pin: str
+
+
+@app.post("/api/auth/conductor")
+async def auth_conductor(payload: AuthConductor):
+    """
+    Verifica PIN y devuelve token de sesión conductor.
+    Los conductores son gestionados manualmente.
+    """
+    for conductor_id, conductor in conductores_autorizados.items():
+        if conductor["pin"] == payload.pin and conductor["activo"]:
+            token = str(uuid.uuid4())
+            return {
+                "token": token,
+                "conductor_id": conductor_id,
+                "nombre": conductor["nombre"],
+                "ruta_asignada": conductor["ruta_asignada"]
+            }
+    return {"error": "PIN inválido o conductor inactivo"}, 401
 
 
 # Umbrales del map matching
