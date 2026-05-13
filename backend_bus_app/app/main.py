@@ -131,6 +131,9 @@ _sesiones_lock = asyncio.Lock()
 sesiones_conductor: dict[str, dict] = {}
 _sesiones_conductor_lock = asyncio.Lock()
 
+# Último GPS recibido del conductor (clave: conductor_token)
+ultimo_gps_conductor: dict[str, dict] = {}
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -642,6 +645,15 @@ async def auth_conductor(payload: AuthConductor):
     return {"error": "PIN inválido o conductor inactivo"}, 401
 
 
+class GpsConductor(BaseModel):
+    """Payload para recibir GPS del conductor cada 5 segundos."""
+    conductor_token: str
+    lat: float
+    lng: float
+    accuracy: Optional[float] = None
+    speed: Optional[float] = None
+
+
 class SesionConductor(BaseModel):
     """Payload para iniciar sesión de conductor."""
     conductor_token: str
@@ -683,6 +695,53 @@ async def iniciar_sesion_conductor(payload: SesionConductor):
             "estado": "activa",
             "inicio": time.time(),
         }
+
+
+@app.post("/api/gps-conductor")
+async def gps_conductor(payload: GpsConductor):
+    """
+    Recibe GPS del conductor cada 5 segundos.
+    Actualiza ultimo_gps_conductor y la sesión de conductor si existe.
+    """
+    ahora = time.time()
+
+    # Validar coordenadas
+    if not (-90 <= payload.lat <= 90 and -180 <= payload.lon <= 180):
+        return {"estado": "rechazado", "motivo": "coordenadas inválidas"}
+
+    # Actualizar ultimo_gps_conductor
+    ultimo_gps_conductor[payload.conductor_token] = {
+        "lat": payload.lat,
+        "lng": payload.lng,
+        "accuracy": payload.accuracy,
+        "speed": payload.speed,
+        "timestamp": ahora,
+    }
+
+    # Si existe sesión de conductor, actualizar posición
+    async with _sesiones_conductor_lock:
+        if payload.conductor_token in sesiones_conductor:
+            sesion = sesiones_conductor[payload.conductor_token]
+            sesion["lat"] = payload.lat
+            sesion["lon"] = payload.lng
+            sesion["vel_ms"] = payload.speed if payload.speed is not None else 0.0
+            sesion["ultimo_gps"] = ahora
+            sesion["activo"] = True
+
+            # Broadcast a todos los clientes WebSocket
+            flota_actual = _get_flota_data_completa()
+            await manager.broadcast({"tipo": "flota", "datos": flota_actual})
+
+            return {
+                "estado": "aceptado",
+                "session_id": sesion["session_id"],
+                "bus_id": f"Conductor-{sesion['session_id'][:4]}",
+            }
+
+    return {
+        "estado": "rechazado",
+        "motivo": "sesión de conductor no encontrada. Inicia sesión primero con /api/sesion-conductor",
+    }
 
 
 # Umbrales del map matching
