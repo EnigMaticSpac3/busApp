@@ -49,7 +49,9 @@ class AnimatedBusMarker extends StatefulWidget {
 class _AnimatedBusMarkerState extends State<AnimatedBusMarker>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  // ignore: unused_field
   late Animation<double> _latAnim;
+  // ignore: unused_field
   late Animation<double> _lonAnim;
 
   @override

@@ -149,4 +149,40 @@ class ApiService {
       return null;
     }
   }
+
+  // -------------------------------------------------------------------------
+  // Conductor
+  // -------------------------------------------------------------------------
+
+  /// Envía la posición GPS del conductor al backend.
+  Future<bool> sendConductorPosition(
+    String token,
+    double lat,
+    double lon,
+    double speed,
+  ) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_base/api/gps-conductor'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: json.encode({
+              'conductor_token': token,
+              'lat': lat,
+              'lng': lon,
+              'accuracy': 10.0,
+              'speed': speed,
+            }),
+          )
+          .timeout(_timeout);
+
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('sendConductorPosition error: $e');
+      return false;
+    }
+  }
 }

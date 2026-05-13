@@ -87,12 +87,12 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
                 decoration: InputDecoration(
                   hintText: '••••',
                   hintStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.3),
+                    color: Colors.white.withValues(alpha: 0.3),
                     letterSpacing: 16,
                   ),
                   counterText: '',
                   enabledBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white.withOpacity(0.5)),
+                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.5)),
                   ),
                   focusedBorder: const UnderlineInputBorder(
                     borderSide: BorderSide(color: AppConfig.colorAccent, width: 2),
