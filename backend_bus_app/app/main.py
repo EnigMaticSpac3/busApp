@@ -127,6 +127,10 @@ paradas_info: list = []
 sesiones_activas: dict[str, dict] = {}
 _sesiones_lock = asyncio.Lock()
 
+# Sesiones de conductor (clave: conductor_token)
+sesiones_conductor: dict[str, dict] = {}
+_sesiones_conductor_lock = asyncio.Lock()
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -419,9 +423,9 @@ async def get_paradas_ruta(ruta_id: str):
 
 @app.get("/api/flota")
 async def get_flota():
-    """Devuelve sesiones activas (buses dinámicos desde contribuidores)."""
+    """Devuelve sesiones activas (buses dinámicos desde contribuidores y conductores)."""
     async with _sesiones_lock:
-        return _get_flota_data()
+        return _get_flota_data_completa()
 
 
 def _get_flota_data() -> list:
@@ -456,6 +460,59 @@ def _get_flota_data() -> list:
     return resultado
 
 
+def _get_flota_data_completa() -> list:
+    """Función helper para obtener datos de la flota (pasajeros + conductores)."""
+    resultado = []
+    ahora = time.time()
+
+    # Sesiones de pasajeros
+    for sesion in sesiones_activas.values():
+        seg = ahora - sesion["ultimo_gps"]
+        if seg > 600:
+            continue
+        modo = (
+            "activo"   if seg < 15 else
+            "incierto" if seg < 300 else
+            "perdido"
+        )
+        contribuidores_activos = sum(
+            1 for c in sesion["contribuidores"].values()
+            if ahora - c["ts"] < 30
+        )
+        resultado.append({
+            "bus_id":             f"Bus-{sesion['session_id']}",
+            "session_id":         sesion["session_id"],
+            "ruta_id":            sesion["ruta_id"],
+            "lat":                sesion["lat"],
+            "lon":                sesion["lon"],
+            "vel_ms":             sesion["vel_ms"],
+            "indice_ruta":        sesion.get("indice_ruta", 0),
+            "modo":               modo,
+            "tipo":               "pasajero",
+            "segundos_sin_senal": round(seg, 0),
+            "contribuidores_activos": contribuidores_activos,
+        })
+
+    # Sesiones de conductor (no expiran como pasajeros)
+    for token, sesion in sesiones_conductor.items():
+        seg = ahora - sesion.get("ultimo_gps", sesion["inicio"])
+        resultado.append({
+            "bus_id":             f"Conductor-{sesion['session_id'][:4]}",
+            "session_id":         sesion["session_id"],
+            "ruta_id":            sesion["ruta_id"],
+            "lat":                sesion.get("lat", 0.0),
+            "lon":                sesion.get("lon", 0.0),
+            "vel_ms":             sesion.get("vel_ms", 0.0),
+            "indice_ruta":        0,
+            "modo":               "activo",
+            "tipo":               "conductor",
+            "segundos_sin_senal": round(seg, 0),
+            "contribuidores_activos": 1,
+        })
+
+    return resultado
+
+
 # WebSocket endpoint
 @app.websocket("/ws/flota")
 async def websocket_endpoint(websocket: WebSocket):
@@ -468,7 +525,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         # Enviar estado actual al conectarse
         async with _sesiones_lock:
-            flota_actual = _get_flota_data()
+            flota_actual = _get_flota_data_completa()
 
         await manager.send_personal(websocket, {"tipo": "flota", "datos": flota_actual})
 
@@ -585,6 +642,49 @@ async def auth_conductor(payload: AuthConductor):
     return {"error": "PIN inválido o conductor inactivo"}, 401
 
 
+class SesionConductor(BaseModel):
+    """Payload para iniciar sesión de conductor."""
+    conductor_token: str
+    ruta_id: str
+
+
+@app.post("/api/sesion-conductor")
+async def iniciar_sesion_conductor(payload: SesionConductor):
+    """
+    Inicia sesión de conductor - GPS activo por 8-12 horas.
+    La sesión no tiene timeout de 5 minutos como pasajero.
+    """
+    async with _sesiones_conductor_lock:
+        # Verificar si ya existe sesión para este token
+        if payload.conductor_token in sesiones_conductor:
+            sesion = sesiones_conductor[payload.conductor_token]
+            return {
+                "session_id": sesion["session_id"],
+                "estado": "activa",
+                "inicio": sesion["inicio"],
+            }
+
+        # Crear nueva sesión de conductor
+        session_id = str(uuid.uuid4())[:8]
+
+        sesiones_conductor[payload.conductor_token] = {
+            "session_id": session_id,
+            "conductor_token": payload.conductor_token,
+            "ruta_id": payload.ruta_id,
+            "inicio": time.time(),
+            "activo": True,
+            "tipo": "conductor",
+        }
+
+        log.info(f"Sesión conductor iniciada: {session_id} para ruta {payload.ruta_id}")
+
+        return {
+            "session_id": session_id,
+            "estado": "activa",
+            "inicio": time.time(),
+        }
+
+
 # Umbrales del map matching
 UMBRAL_DISTANCIA_RUTA_M  = 35.0   # metros — qué tan cerca debe estar de la ruta
 UMBRAL_VELOCIDAD_MIN_MS  = 1.4    # m/s — ~5 km/h mínimo para considerar que va en bus
@@ -601,7 +701,8 @@ VENTANA_PROMEDIO_S    = 30    # segundos de ventana para promedio ponderado
  
 class UbicacionUsuario(BaseModel):
     """Payload que envía el celular del usuario contribuidor."""
-    session_id:   str           # ID de sesión activa (del endpoint iniciar-sesion-bus)
+    session_id:   Optional[str] = None  # ID de sesión pasajero (del endpoint iniciar-sesion-bus)
+    conductor_token: Optional[str] = None  # Token de conductor (si es modo conductor)
     usuario_id:   str           # ID anónimo generado en el celular (UUID)
     ruta_id:      str = "SA_R1" # ruta por defecto
     lat:          float
@@ -702,7 +803,50 @@ async def contribuir_ubicacion(payload: UbicacionUsuario):
             "vel_ms":  payload.velocidad_ms,
         }
 
-    # Buscar la sesión por ruta_id
+    # Determinar si es conductor o pasajero
+    es_conductor = payload.conductor_token is not None
+
+    if es_conductor:
+        # Modo conductor - buscar o crear sesión de conductor
+        async with _sesiones_conductor_lock:
+            if payload.conductor_token not in sesiones_conductor:
+                # Crear sesión de conductor automáticamente
+                session_id = str(uuid.uuid4())[:8]
+                sesiones_conductor[payload.conductor_token] = {
+                    "session_id": session_id,
+                    "conductor_token": payload.conductor_token,
+                    "ruta_id": payload.ruta_id,
+                    "lat": payload.lat,
+                    "lon": payload.lon,
+                    "vel_ms": payload.velocidad_ms,
+                    "inicio": time.time(),
+                    "ultimo_gps": time.time(),
+                    "activo": True,
+                    "tipo": "conductor",
+                }
+                log.info(f"Sesión conductor creada automáticamente: {session_id}")
+
+            sesion = sesiones_conductor[payload.conductor_token]
+            sesion["lat"] = payload.lat
+            sesion["lon"] = payload.lon
+            sesion["vel_ms"] = payload.velocidad_ms
+            sesion["ultimo_gps"] = time.time()
+            sesion["activo"] = True
+
+            # Broadcast a todos los clientes WebSocket
+            flota_actual = _get_flota_data_completa()
+            await manager.broadcast({"tipo": "flota", "datos": flota_actual})
+
+            return {
+                "estado": "aceptado",
+                "tipo": "conductor",
+                "session_id": sesion["session_id"],
+                "bus_id": f"Conductor-{sesion['session_id'][:4]}",
+                "lat": payload.lat,
+                "lon": payload.lon,
+            }
+
+    # Modo pasajero - sesión tradicional
     async with _sesiones_lock:
         if payload.ruta_id not in sesiones_activas:
             return {
@@ -743,7 +887,7 @@ async def contribuir_ubicacion(payload: UbicacionUsuario):
         sesion["modo"] = "activo"
 
         # Broadcast a todos los clientes WebSocket
-        flota_actual = _get_flota_data()
+        flota_actual = _get_flota_data_completa()
         await manager.broadcast({"tipo": "flota", "datos": flota_actual})
 
     log.info(
