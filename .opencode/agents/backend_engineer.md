@@ -3,8 +3,8 @@
 # Repository: /home/jgonz/projects/busApp
 
 ## 🎯 Responsabilidad Principal
-Implementar WebSocket para tiempo real, soporte de múltiples rutas,
-y modo conductor oficial.
+Implementar modo conductor oficial con autenticación simple,
+sesiones GPS de larga duración, y "Dead Man's Switch".
 
 ---
 
@@ -198,4 +198,67 @@ VENTANA_PROMEDIO_S      = 30
 - [ ] Clientes reciben push cuando cambia la flota
 - [ ] `/api/flota` HTTP sigue funcionando como fallback
 - [ ] Múltiples rutas cargan automáticamente desde GTFS
+- [ ] Commit: `feat(backend): descripción corta`
+
+---
+
+## 🚀 Tareas Sprint v5A — Modo Conductor
+
+### Modelo de Conductores (gestión manual)
+```python
+# Tabla de conductores (en memoria para MVP, luego DB)
+conductores_autorizados = {
+    "conductor_001": {
+        "nombre": "Juan Pérez",
+        "pin": "1234",  # PIN de 4 dígitos
+        "ruta_asignada": "SA_INTERNAL",
+        "activo": True,
+    }
+}
+```
+
+### Endpoint POST /api/auth/conductor
+```python
+class AuthConductor(BaseModel):
+    pin: str
+
+@app.post("/api/auth/conductor")
+async def auth_conductor(payload: AuthConductor):
+    """Verifica PIN y devuelve token de sesión conductor."""
+    for conductor_id, conductor in conductores_autorizados.items():
+        if conductor["pin"] == payload.pin and conductor["activo"]:
+            token = generar_token(conductor_id)
+            return {"token": token, "conductor_id": conductor_id, "nombre": conductor["nombre"]}
+    return {"error": "PIN inválido o conductor inactivo"}, 401
+```
+
+### Endpoint POST /api/sesion-conductor (sesión de 8-12h)
+```python
+class SesionConductor(BaseModel):
+    conductor_token: str
+    ruta_id: str
+
+@app.post("/api/sesion-conductor")
+async def iniciar_sesion_conductor(payload: SesionConductor):
+    """Inicia sesión de conductor - GPS activo por 8-12 horas."""
+    # Verificar token
+    conductor_id = verificar_token(payload.conductor_token)
+    # Crear sesión de conductor (diferente a sesión pasajero)
+    # Timeout: 30s para "Dead Man's Switch"
+```
+
+### "Dead Man's Switch"
+```python
+# En el monitor de sesiones
+if sesion["tipo"] == "conductor" and tiempo_sin_senal > 30:
+    # Desactivar sesión inmediatamente
+    log.warning(f"Conductor {conductor_id} perdió señal > 30s - sesión terminada")
+    sesion["activo"] = False
+```
+
+### Definition of Done v5A
+- [ ] Endpoint `/api/auth/conductor` verifica PIN y devuelve token
+- [ ] Endpoint `/api/sesion-conductor` inicia sesión de larga duración
+- [ ] "Dead Man's Switch" termina sesión si señal > 30s
+- [ ] Sesión conductor tiene peso 3x en promedio GPS
 - [ ] Commit: `feat(backend): descripción corta`

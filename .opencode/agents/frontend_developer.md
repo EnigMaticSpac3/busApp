@@ -3,8 +3,8 @@
 # Repository: /home/jgonz/projects/busApp
 
 ## 🎯 Responsabilidad Principal
-Implementar WebSocket para reemplazar polling, animación suave
-de marcadores, y soporte de múltiples rutas en la UI.
+Implementar modo conductor con autenticación PIN, UI minimalista
+para conductor, y detección de rol (conductor vs pasajero).
 
 ---
 
@@ -245,5 +245,177 @@ lib/
 - [ ] Indicador de conexión WebSocket visible en UI
 - [ ] Marcadores se mueven suavemente entre posiciones
 - [ ] Fallback a HTTP polling si WebSocket falla
+- [ ] Compila en Chrome y dispositivo físico
+- [ ] Commit: `feat(frontend): descripción corta`
+
+---
+
+## 🚀 Tareas Sprint v5A — Modo Conductor
+
+### Pantalla de Login
+```
+Rama: feat/frontend-login-conductor
+```
+Pantalla inicial con dos opciones:
+- "Soy Pasajero" → flujo actual (mapa/rutas)
+- "Soy Conductor" → pedir PIN
+
+```dart
+// lib/screens/login_screen.dart
+class LoginScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text('San Antonio Bus Tracker', style: TextStyle(fontSize: 24)),
+          const SizedBox(height: 32),
+          ElevatedButton(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MapScreen())),
+            child: const Text('Soy Pasajero'),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton(
+            onPressed: () => _mostrarDialogoPin(context),
+            child: const Text('Soy Conductor'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostrarDialogoPin(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Ingresa tu PIN'),
+        content: TextField(
+          keyboardType: TextInputType.number,
+          maxLength: 4,
+          obscureText: true,
+          decoration: const InputDecoration(hintText: 'PIN de 4 dígitos'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          ElevatedButton(onPressed: () => _verificarPin(context), child: const Text('Entrar')),
+        ],
+      ),
+    );
+  }
+}
+```
+
+### UI Modo Conductor (minimalista)
+```
+Rama: feat/frontend-pantalla-conductor
+```
+Pantalla simplificada para conductor:
+- GPS siempre activo
+- Indicador de sesión activa
+- "Dead Man's Switch" - botón que confirma que está vivo
+
+```dart
+// lib/screens/conductor_screen.dart
+class ConductorScreen extends StatefulWidget {
+  @override
+  State<ConductorScreen> createState() => _ConductorScreenState();
+}
+
+class _ConductorScreenState extends State<ConductorScreen> {
+  bool _activo = true;
+  Timer? _deadManTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _iniciarGPSConductor();
+    // Reiniciar Dead Man's Switch cada 25s
+    _deadManTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+      // Si no se presiona el botón, la sesión se closes
+    });
+  }
+
+  @override
+  void dispose() {
+    _deadManTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Indicador de sesión
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: _activo ? Colors.green : Colors.red,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(_activo ? Icons.check_circle : Icons.error, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text(
+                    _activo ? 'Sesión Activa' : 'Sesión Inactiva',
+                    style: const TextStyle(color: Colors.white, fontSize: 18),
+                  ),
+                ],
+              ),
+            ),
+            // Botón Dead Man's Switch
+            Expanded(
+              child: Center(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.all(32),
+                    backgroundColor: Colors.green,
+                  ),
+                  onPressed: () {
+                    // Reiniciar timer
+                  },
+                  child: const Text('MANTENER ACTIVO', style: TextStyle(fontSize: 24)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+### Detección de Rol
+```
+Rama: feat/frontend-detectar-rol
+```
+- Si el login es de conductor → mostrar ConductorScreen
+- Si es pasajero → mostrar HomeScreen (Mapa/Rutas)
+
+```dart
+// En main.dart
+void main() async {
+  final prefs = await SharedPreferences.getInstance();
+  final modo = prefs.getString('modo'); // 'pasajero' o 'conductor'
+  final tokenConductor = prefs.getString('token_conductor');
+
+  runApp(BusApp(
+    modo: modo == 'conductor' && tokenConductor != null ? Modo.conductor : Modo.pasajero,
+  ));
+}
+
+enum Modo { pasajero, conductor }
+```
+
+### Definition of Done v5A
+- [ ] Pantalla de login con opciones "Pasajero" / "Conductor"
+- [ ] Dialog para ingreso de PIN de conductor
+- [ ] API llama `/api/auth/conductor` y guarda token
+- [ ] Conductor Screen muestra estado de sesión
+- [ ] Botón "Mantener Activo" para Dead Man's Switch
+- [ ] main.dart detecta rol y muestra pantalla correcta
 - [ ] Compila en Chrome y dispositivo físico
 - [ ] Commit: `feat(frontend): descripción corta`

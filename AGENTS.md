@@ -43,6 +43,7 @@ busApp/
 | **v2** | ✅ Estable | Sesiones dinámicas, crowdsourcing real, validado en campo |
 | **v3** | ✅ Completado | Menú de rutas, ubicación usuario, NavigationBar |
 | **v4** | 🔄 En desarrollo | WebSocket, animaciones, múltiples rutas |
+| **v5** | ⬜ Planificación | Modo conductor, notificaciones push, OTP, deployment |
 
 ---
 
@@ -66,9 +67,30 @@ busApp/
 - Soporte múltiples rutas GTFS
 
 ### ⬜ Pendientes (v5)
-- PostGIS con persistencia de trayectorias
-- Modo conductor oficial
-- Deployment producción
+
+**Problemas a resolver:**
+| Problema actual | Solución v5 |
+|-----------------|-------------|
+| Crowdsourcing pasajero | Modo conductor (1 dispositivo por bus) |
+| App siempre abierta | Notificaciones push (FCM gratuito) |
+| Mapa activo = robo | Alerta de proximidad en pantalla bloqueada |
+| Sin planificador | OpenTripPlanner (OTP) + GTFS local |
+| ngrok temporal | Fly.io (cuando haya MVP funcional) |
+
+**Roadmap v5:**
+
+| Fase | Descripción |
+|------|-------------|
+| v5A | Modo conductor: autenticación simple, detección de rol, UI minimalista, sesión GPS 8-12h, "Dead Man's Switch" |
+| v5B | Notificaciones push: Firebase FCM, geofencing servidor (bus a 500m → push) |
+| v5C | Planificador de rutas: OpenTripPlanner, GTFS local + OSM Panamá |
+| v5D | Deployment Fly.io |
+
+**Decisiones tomadas:**
+1. Una sola app con dos modos (conductor/pasajero según credenciales)
+2. Firebase gratuito (FCM sin costo)
+3. Modo conductor primero
+4. Conductores manejados manualmente (MVP)
 
 ---
 

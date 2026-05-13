@@ -58,9 +58,39 @@ feat/frontend-*   feat/backend-*   chore/devops-*
 v1 ✅  Mapa básico, ruta E598, simulación GPS
 v2 ✅  Sesiones dinámicas, crowdsourcing real, validado en campo
 v3 ✅  Menú de rutas, ubicación usuario, navegación tabs
-v4 🔄  WebSocket, animaciones, múltiples rutas, modo conductor
-v5 ⬜  PostGIS, autenticación JWT, API pública, deployment prod
+v4 ✅  WebSocket, animaciones, múltiples rutas
+v5A 🔄 Modo conductor (autenticación PIN, UI conductor, Dead Man's Switch)
+v5B ⬜ Notificaciones push (Firebase FCM)
+v5C ⬜ Planificador de rutas (OTP)
+v5D ⬜ Deployment Fly.io
 ```
+
+---
+
+## 🎯 Backlog Sprint v5A — Modo Conductor
+
+### Fase 1 — Backend
+
+| # | Rama | Descripción | Estado |
+|---|------|-------------|--------|
+| 1 | `feat/backend-auth-conductor` | Endpoint POST /api/auth/conductor (verificar PIN) | ⬜ |
+| 2 | `feat/backend-sesion-conductor` | Endpoint POST /api/sesion-conductor (8-12h GPS) | ⬜ |
+| 3 | `feat/backend-dead-man-switch` | Timeout de 30s para sesiones conductor | ⬜ |
+
+### Fase 2 — Frontend
+
+| # | Rama | Descripción | Depende de |
+|---|------|-------------|------------|
+| 4 | `feat/frontend-login-conductor` | Pantalla login con opciones Pasajero/Conductor | ninguna |
+| 5 | `feat/frontend-pantalla-conductor` | UI minimalista conductor (GPS activo, Dead Man's Switch) | Backend #1-3 |
+| 6 | `feat/frontend-detectar-rol` | main.dart detecta rol y muestra pantalla correcta | #4, #5 |
+
+### Fase 3 — DevOps
+
+| # | Rama | Descripción |
+|---|------|-------------|
+| 7 | `chore/devops-firebase-fcm` | Configurar Firebase para notificaciones push (v5B) |
+| 8 | `chore/devops-db-conductores` | Tabla de conductores en DB (gestión manual) |
 
 ---
 
