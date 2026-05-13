@@ -268,8 +268,17 @@ async def monitor_sesiones():
                     if ahora - datos["ts"] < 60
                 }
 
-                # Si no quedan contribuidores y han pasado 10 minutos → eliminar
-                if not sesion["contribuidores"] and ahora - sesion["ultimo_gps"] > TIMEOUT_ELIMINAR_S:
+                # Calcular tiempo sin señal de la sesión
+                seg_sin_senal = ahora - sesion["ultimo_gps"]
+
+                # Eliminar sesión si:
+                # 1. No hay contribuidores Y pasaron 10 min sin señal, O
+                # 2. Hay contribuidores pero ninguno ha enviado señal en 10 min
+                contribuidores_activos = [
+                    c for c in sesion["contribuidores"].values()
+                    if ahora - c["ts"] < TIMEOUT_ELIMINAR_S
+                ]
+                if (not sesion["contribuidores"] or not contribuidores_activos) and seg_sin_senal > TIMEOUT_ELIMINAR_S:
                     rutas_a_eliminar.append(ruta_id)
                     continue
 
