@@ -247,12 +247,6 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('San Antonio Bus Tracker'),
-        backgroundColor: AppConfig.colorPrimary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
       body: Column(
         children: [
           // Banner de salida de ruta
