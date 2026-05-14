@@ -27,18 +27,34 @@ class AppConfig {
 
   // Primario - Baltic Blue (#0256a4)
   static const Color colorPrimary = Color(0xFF0256a4);
+  static const Color colorPrimary50 = Color(0xFFe8f2fa);
+  static const Color colorPrimary300 = Color(0xFF7ab3e0);
+  static const Color colorPrimary600 = Color(0xFF2f74ad);
+  static const Color colorPrimary900 = Color(0xFF013a70);
 
   // Secundario - Rich Cerulean (#2f74ad)
   static const Color colorSecondary = Color(0xFF2f74ad);
 
   // Acento/ETA normal - Lemon Lime (#bfd244)
   static const Color colorAccent = Color(0xFFbfd244);
+  static const Color colorAccent50 = Color(0xFFf4f8d0);
+  static const Color colorAccent300 = Color(0xFFd4e46a);
+  static const Color colorAccent600 = Color(0xFF8fa020);
+  static const Color colorAccent900 = Color(0xFF576010);
 
   // Alerta/Urgencia - Atomic Tangerine (#e57a44)
   static const Color colorAlert = Color(0xFFe57a44);
+  static const Color colorAlert50 = Color(0xFFfdf0e8);
+  static const Color colorAlert300 = Color(0xFFf0ac80);
+  static const Color colorAlert600 = Color(0xFFb85520);
+  static const Color colorAlert900 = Color(0xFF7a2f0e);
 
   // Texto principal - Carbon Black (#242423)
   static const Color colorText = Color(0xFF242423);
+  static const Color colorText50 = Color(0xFFf0f0ef);
+  static const Color colorText300 = Color(0xFF868684);
+  static const Color colorText600 = Color(0xFF484846);
+  static const Color colorText900 = Color(0xFF101010);
 
   // Superficies
   static const Color surfacePrimary = Color(0xFFffffff);
@@ -47,11 +63,9 @@ class AppConfig {
   static const Color surfaceSuccess = Color(0xFFf4f8d0);
   static const Color surfaceWarning = Color(0xFFfdf0e8);
 
-  // Variantes para estados
-  static const Color primaryLight = Color(0xFF7ab3e0);
-  static const Color primaryDark = Color(0xFF013a70);
-  static const Color accentDark = Color(0xFF8fa020);
-  static const Color alertDark = Color(0xFFb85520);
-  static const Color textSecondary = Color(0xFF484846);
-  static const Color borderLight = Color(0xFF868684);
+  // Texto sobre colores
+  static const Color textOnPrimary = Color(0xFFffffff);
+  static const Color textOnLime = Color(0xFF2a3800);
+  static const Color textOnOrange = Color(0xFF4a1a00);
+  static const Color textNeutral = Color(0xFF242423);
 }

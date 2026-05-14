@@ -123,6 +123,45 @@ flutter run -d chrome     # Web
 6. Tocar "Estoy en el bus" → Selección de ruta → Contribuir GPS
 ```
 
+## 🎨 Paleta de Colores Oficial
+
+```css
+/* Colores base */
+--color-primary: #0256a4;        /* Azul oscuro - AppBar, botones principales */
+--color-primary-secondary: #2f74ad;  /* Azul medio */
+--color-accent: #bfd244;         /* Verde/lima - destacados, acciones */
+--color-alert: #e57a44;          /* Naranja - buses, alertas, estado incierto */
+--color-text: #242423;           /* Gris oscuro - texto */
+
+/* Ramps */
+--color-blue-50: #e8f2fa;
+--color-blue-300: #7ab3e0;
+--color-blue-600: #2f74ad;
+--color-blue-900: #013a70;
+
+--color-lime-50: #f4f8d0;
+--color-lime-300: #d4e46a;
+--color-lime-600: #8fa020;
+--color-lime-900: #576010;
+
+--color-orange-50: #fdf0e8;
+--color-orange-300: #f0ac80;
+--color-orange-600: #b85520;
+--color-orange-900: #7a2f0e;
+
+--color-gray-50: #f0f0ef;
+--color-gray-300: #868684;
+--color-gray-600: #484846;
+--color-gray-900: #101010;
+
+/* Superficies */
+--surface-primary: #ffffff;
+--surface-secondary: #f2f2f0;
+--surface-info: #e8f2fa;
+--surface-success: #f4f8d0;
+--surface-warning: #fdf0e8;
+```
+
 ## Critical Configurations
 
 - **Backend URL** in `bus_app/lib/config/app_config.dart:11`
@@ -157,6 +196,57 @@ curl http://localhost:8000/api/rutas/SA_INTERNAL/paradas
 # Test WebSocket (cuando esté implementado)
 wscat -c ws://localhost:8000/ws/flota
 ```
+
+---
+
+## 🤖 Modelos de IA Recomendados (por agente)
+
+| Agente | Modelo Principal | Alternativa | Fallback |
+|--------|------------------|------------|----------|
+| **Backend** (FastAPI, Python) | GPT-4.1 | Deepseek V4 Flash | MiniMax M2.5 |
+| **Frontend** (Flutter, Dart, UI) | GPT-4o | GPT-4.1 | MiniMax M2.5 |
+| **DevOps** (Docker, infraestructura) | Deepseek V4 Flash | MiniMax M2.5 | Siempre disponible |
+| **Documentación** (.md, planning) | GPT-5-mini | Deepseek V4 Flash | MiniMax M2.5 |
+
+**Nota:** GitHub Copilot proporciona acceso gratuito a GPT-4.1 y GPT-4o. Cuando se agoten los créditos, usa Deepseek V4 Flash como alternativa.
+
+---
+
+## 📦 Skills Recomendadas (por fase)
+
+### Instaladas Actualmente ✅
+- `devops-engineer` — Docker, CI/CD, infraestructura
+- `fastapi-python` — Backend FastAPI con async
+- `flutter-add-widget-test` — Tests de widgets en Flutter
+- `security-review` — Autenticación, APIs seguras
+- `find-skills` — Descubrir skills del ecosistema
+
+### Para v5A (Modo Conductor) - Próximas a instalar
+```bash
+npx skills find jwt-authentication
+npx skills find flutter-background-location
+```
+
+### Para v5B (Notificaciones) - A buscar
+```bash
+npx skills find firebase-fcm
+```
+
+### Para v5C (Planificador) - A buscar
+```bash
+npx skills find opentrip-planner
+npx skills find gtfs
+npx skills find postgis
+```
+
+### Útiles en General - Opcional
+```bash
+npx skills find websocket-optimization
+npx skills find fly-io-deployment
+npx skills find flutter-development
+```
+
+---
 
 ## Skills Instaladas
 - flutter-add-widget-test

@@ -419,3 +419,62 @@ enum Modo { pasajero, conductor }
 - [ ] main.dart detecta rol y muestra pantalla correcta
 - [ ] Compila en Chrome y dispositivo físico
 - [ ] Commit: `feat(frontend): descripción corta`
+
+---
+
+## 🤖 Modelos y Skills Recomendados
+
+### Modelo de IA (por complejidad de tarea)
+| Tarea | Modelo Recomendado | Alternativa |
+|-------|-------------------|------------|
+| UI compleja, navegación, Dart avanzado | **GPT-4o** | GPT-4.1 |
+| Tareas simples (UI tweaks, widgets) | **GPT-4o** | MiniMax M2.5 |
+| Fallback (cuando se agoten créditos) | **MiniMax M2.5** | Siempre disponible |
+
+**Recomendación:** Usa GPT-4o desde GitHub Copilot para tareas de Flutter/Dart (background GPS, autenticación, UI conductor). GPT-4o tiene mejor contexto del ecosistema Dart que otros modelos.
+
+### Skills recomendadas
+| Fase | Skill | Comando |
+|------|-------|---------|
+| v5A | `flutter-add-widget-test` | ✅ Ya instalada |
+| v5A | `flutter-background-location` | `npx skills add <owner/repo@flutter-bg-location>` |
+| v4 | `websocket-optimization` | `npx skills find websocket` |
+| General | `flutter-development` | `npx skills add aj-geddes/useful-ai-prompts@flutter-development` |
+
+---
+
+## 🔀 Git Flow (OBLIGATORIO)
+
+**Cada tarea debe seguir este flujo:**
+
+1. **Crear rama desde master:**
+   ```bash
+   git checkout master
+   git pull origin master
+   git checkout -b feat/frontend-nombre-tarea
+   # o fix/frontend-nombre-tarea
+   # o chore/frontend-nombre-tarea
+   ```
+
+2. **Commit con convención:**
+   ```
+   feat(frontend): descripción corta
+   fix(frontend): descripción corta
+   chore(frontend): descripción corta
+   ```
+
+3. **Al terminar la tarea:**
+   - Merge a master: `git checkout master && git merge nombre-rama`
+   - Eliminar rama: `git branch -d nombre-rama`
+   - Quedar en master
+
+4. **Repositorio limpio:** Solo master y develop (sin ramas de feature activas)
+
+**Excepciones:**
+- Ramas de UI en desarrollo activo pueden ficar en develop temporarily
+- Pero al completar, siempre merge a master
+
+**NOhacer:**
+- Commits directos a master (sin rama)
+- Dejar ramas huérfanas sin merge
+- Mezclar múltiples tareas en una misma rama

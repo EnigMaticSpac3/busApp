@@ -262,3 +262,58 @@ if sesion["tipo"] == "conductor" and tiempo_sin_senal > 30:
 - [ ] "Dead Man's Switch" termina sesión si señal > 30s
 - [ ] Sesión conductor tiene peso 3x en promedio GPS
 - [ ] Commit: `feat(backend): descripción corta`
+
+---
+
+## 🤖 Modelos y Skills Recomendados
+
+### Modelo de IA (por complejidad de tarea)
+| Tarea | Modelo Recomendado | Alternativa |
+|-------|-------------------|------------|
+| Lógica compleja (JWT, DB, map-matching) | **GPT-4.1** | Deepseek V4 Flash |
+| Tareas simples (bug fixes, refactoring) | **Deepseek V4 Flash** | MiniMax M2.5 |
+| Fallback (cuando se agoten créditos) | **MiniMax M2.5** | Siempre disponible |
+
+**Recomendación:** Usa GPT-4.1 desde GitHub Copilot para tareas de v5 (autenticación JWT, Dead Man's Switch). Cuando se agoten los créditos, cambia a Deepseek V4 Flash.
+
+### Skills recomendadas
+| Fase | Skill | Comando |
+|------|-------|---------|
+| v5A | `jwt-authentication` | `npx skills add <owner/repo@jwt-auth>` |
+| v5B | `firebase-fcm` | `npx skills add <owner/repo@firebase-fcm>` |
+| v5C | `opentrip-planner` | `npx skills find opentrip` |
+| v5C | `postgis` | `npx skills find postgis` |
+
+---
+
+## 🔀 Git Flow (OBLIGATORIO)
+
+**Cada tarea debe seguir este flujo:**
+
+1. **Crear rama desde master:**
+   ```bash
+   git checkout master
+   git pull origin master
+   git checkout -b feat/backend-nombre-tarea
+   # o fix/backend-nombre-tarea
+   # o chore/backend-nombre-tarea
+   ```
+
+2. **Commit con convención:**
+   ```
+   feat(backend): descripción corta
+   fix(backend): descripción corta
+   chore(backend): descripción corta
+   ```
+
+3. **Al terminar la tarea:**
+   - Merge a master: `git checkout master && git merge nombre-rama`
+   - Eliminar rama: `git branch -d nombre-rama`
+   - Quedar en master
+
+4. **Repositorio limpio:** Solo master y develop (sin ramas de feature activas)
+
+**NOhacer:**
+- Commits directos a master (sin rama)
+- Dejar ramas huérfanas sin merge
+- Mezclar múltiples tareas en una misma rama

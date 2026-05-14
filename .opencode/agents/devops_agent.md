@@ -143,3 +143,56 @@ Deployment prod     → Pendiente para cuando la app madure ⬜
 - [ ] .env.example documentado y commiteado
 - [ ] fly.toml preparado para cuando sea el momento
 - [ ] Commit: `chore(devops): descripción corta`
+
+---
+
+## 🤖 Modelos y Skills Recomendados
+
+### Modelo de IA (por complejidad de tarea)
+| Tarea | Modelo Recomendado | Alternativa |
+|-------|-------------------|------------|
+| Infraestructura simple (Docker, .env) | **Deepseek V4 Flash** | MiniMax M2.5 |
+| Deployment complejo (Fly.io, K8s) | **GPT-4.1** | Deepseek V4 Flash |
+| Fallback (cuando se agoten créditos) | **MiniMax M2.5** | Siempre disponible |
+
+**Recomendación:** Usa Deepseek V4 Flash para tareas de DevOps. Son predecibles y no necesitan el modelo más potente. Ahorra GPT-4.1 para backend y frontend.
+
+### Skills recomendadas
+| Fase | Skill | Comando |
+|------|-------|---------|
+| v5B | `firebase-fcm` | `npx skills add <owner/repo@firebase-fcm>` |
+| v5D | `fly-io-deployment` | `npx skills add <owner/repo@fly-io>` |
+| Actual | `devops-engineer` | ✅ Ya instalada |
+| Actual | `docker` | ✅ Ya instalada |
+
+---
+
+## 🔀 Git Flow (OBLIGATORIO)
+
+**Cada tarea debe seguir este flujo:**
+
+1. **Crear rama desde master:**
+   ```bash
+   git checkout master
+   git pull origin master
+   git checkout -b chore/devops-nombre-tarea
+   # o feat/devops-nombre-tarea
+   ```
+
+2. **Commit con convención:**
+   ```
+   chore(devops): descripción corta
+   feat(devops): descripción corta
+   ```
+
+3. **Al terminar la tarea:**
+   - Merge a master: `git checkout master && git merge nombre-rama`
+   - Eliminar rama: `git branch -d nombre-rama`
+   - Quedar en master
+
+4. **Repositorio limpio:** Solo master y develop
+
+**Reglas específicas DevOps:**
+- NUNCA commitear .env con valores reales
+- Mantener .env.example documentado
+- Verificar imágenes Docker < 200MB
