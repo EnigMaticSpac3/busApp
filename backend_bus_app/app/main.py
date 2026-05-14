@@ -715,7 +715,7 @@ async def gps_conductor(payload: GpsConductor):
     ahora = time.time()
 
     # Validar coordenadas
-    if not (-90 <= payload.lat <= 90 and -180 <= payload.lon <= 180):
+    if not (-90 <= payload.lat <= 90 and -180 <= payload.lng <= 180):
         return {"estado": "rechazado", "motivo": "coordenadas inválidas"}
 
     # Actualizar ultimo_gps_conductor
