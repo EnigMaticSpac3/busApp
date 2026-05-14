@@ -123,9 +123,6 @@ flutter run -d chrome     # Web
 - Velocidad: 1.4-16 m/s (~5-60 km/h)
 - GPS precisión: >50m rechazado
 
-## Contribuidores e IA
-
-Este proyecto usa OpenCode con agentes especializados y modelos de IA gratuitos (MiniMax M2.5 Free, DeepSeek V4 Flash Free).
 
 ## Licencia
 
