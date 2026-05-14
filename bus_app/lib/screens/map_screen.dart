@@ -271,16 +271,16 @@ class _MapScreenState extends State<MapScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               width: double.infinity,
-              color: Colors.red.shade100,
+              color: AppConfig.colorAlert50,
               child: Row(
                 children: [
-                  Icon(Icons.warning_amber, color: Colors.red.shade700, size: 20),
+                  Icon(Icons.warning_amber, color: AppConfig.colorAlert900, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Dejaste de contribuir (saliste de la ruta)',
                       style: TextStyle(
-                        color: Colors.red.shade700,
+                        color: AppConfig.colorAlert900,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -319,6 +319,7 @@ class _MapScreenState extends State<MapScreen> {
               heroTag: 'centrar',
               onPressed: _centrarEnUsuario,
               backgroundColor: Colors.white,
+              tooltip: 'Centrar en mi ubicación',
               child: Icon(Icons.my_location, color: AppConfig.colorPrimary),
             ),
           ),
@@ -326,6 +327,7 @@ class _MapScreenState extends State<MapScreen> {
         FloatingActionButton.extended(
           heroTag: 'contribuir',
           onPressed: _toggleContribucion,
+          tooltip: activo ? 'Detener contribución GPS' : 'Iniciar contribución GPS',
           backgroundColor: activo ? AppConfig.colorAccent : AppConfig.colorPrimary,
           icon: Icon(
             activo ? Icons.location_on : Icons.location_off,
@@ -333,7 +335,7 @@ class _MapScreenState extends State<MapScreen> {
           ),
           label: Text(
             activo
-                ? (busId != null ? 'En $busId 🟢' : (ignorado ? 'Buscando bus...' : 'Contribuyendo 🟢'))
+                ? (busId != null ? 'En $busId' : (ignorado ? 'Buscando bus...' : 'Contribuyendo'))
                 : 'Contribuir',
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),

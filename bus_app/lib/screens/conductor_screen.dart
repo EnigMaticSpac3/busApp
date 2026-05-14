@@ -326,7 +326,7 @@ class _ConductorScreenState extends State<ConductorScreen> {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
+              color: Colors.white.withValues(alpha: 0.9),
               fontSize: 12,
             ),
           ),

@@ -172,7 +172,7 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
             border: Border.all(
               color: _hasError
                   ? AppConfig.colorAlert
-                  : Colors.white.withValues(alpha: 0.3),
+                  : Colors.white.withValues(alpha: 0.5),
               width: 2,
             ),
           ),
@@ -195,7 +195,7 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
             decoration: InputDecoration(
               hintText: '••••',
               hintStyle: TextStyle(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withValues(alpha: 0.5),
                 letterSpacing: 24,
                 fontSize: 32,
               ),
@@ -304,14 +304,14 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
         children: [
           Icon(
             Icons.arrow_back,
-            color: Colors.white.withValues(alpha: 0.7),
+            color: Colors.white.withValues(alpha: 0.9),
             size: 20,
           ),
           const SizedBox(width: 4),
           Text(
             'Volver',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
+              color: Colors.white.withValues(alpha: 0.9),
               fontSize: 16,
             ),
           ),
