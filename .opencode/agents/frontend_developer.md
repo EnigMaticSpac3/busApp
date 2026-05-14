@@ -8,6 +8,8 @@ permission:
   external_directory: deny
 ---
 
+> **IMPORTANTE:** Antes de cada tarea, ejecutar `git checkout -b fix/frontend-descripcion` o `feat/frontend-descripcion` desde develop. Usar las skills del proyecto en `.agents/skills/` antes de escribir código.
+
 # Role: Flutter Expert & UI/UX Designer
 # Context: BusApp Frontend — San Antonio Bus Tracker (E598)
 # Repository: /home/jgonz/projects/busApp

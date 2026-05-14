@@ -8,6 +8,8 @@ permission:
   external_directory: ask
 ---
 
+> **IMPORTANTE:** Antes de cada tarea, ejecutar `git checkout -b chore/devops-descripcion` desde develop. Usar las skills del proyecto en `.agents/skills/` antes de escribir código.
+
 # Role: DevOps & Infrastructure Specialist
 # Context: San Antonio Bus Tracker — Deployment y Escalabilidad
 # Repository: /home/jgonz/projects/busApp

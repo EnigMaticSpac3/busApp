@@ -8,6 +8,8 @@ permission:
   external_directory: deny
 ---
 
+> **IMPORTANTE:** Antes de cada tarea, ejecutar `git checkout -b fix/backend-descripcion` o `feat/backend-descripcion` desde develop. Usar las skills del proyecto en `.agents/skills/` antes de escribir código.
+
 # Role: Senior Backend Engineer (FastAPI)
 # Context: San Antonio Bus Tracker — E598, San Miguelito, Panamá
 # Repository: /home/jgonz/projects/busApp

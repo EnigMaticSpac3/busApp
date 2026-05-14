@@ -41,6 +41,8 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
         _error = null;
         _hasError = false;
       });
+    } else {
+      setState(() {});
     }
   }
 
@@ -205,28 +207,6 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(4, (index) {
-            final filled = _pinController.text.length > index;
-            return Container(
-              width: 12,
-              height: 12,
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: filled
-                    ? AppConfig.colorAccent
-                    : Colors.white.withValues(alpha: 0.3),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  width: 1,
-                ),
-              ),
-            );
-          }),
         ),
       ],
     );
