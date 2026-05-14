@@ -72,7 +72,15 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
       );
 
       if (ok && mounted) {
-        Navigator.pushReplacementNamed(context, '/conductor');
+        Navigator.pushReplacementNamed(
+          context,
+          '/conductor',
+          arguments: {
+            'conductorToken': conductor.token,
+            'nombreConductor': conductor.nombre,
+            'rutaAsignada': conductor.rutaAsignada,
+          },
+        );
       } else {
         setState(() {
           _error = 'Error al iniciar sesión';
