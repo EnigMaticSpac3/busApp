@@ -65,17 +65,17 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIndex: _tabIndex,
         onDestinationSelected: (i) => setState(() => _tabIndex = i),
         backgroundColor: AppConfig.colorPrimary,
-        indicatorColor: AppConfig.colorAccent,
+        indicatorColor: Colors.white.withValues(alpha: 0.3),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.map_outlined, color: Colors.white),
-            selectedIcon: Icon(Icons.map, color: AppConfig.colorPrimary),
+            icon: Icon(Icons.map_outlined, color: Colors.white70),
+            selectedIcon: Icon(Icons.map, color: Colors.white),
             label: 'Mapa',
           ),
           NavigationDestination(
-            icon: Icon(Icons.directions_bus_outlined, color: Colors.white),
-            selectedIcon: Icon(Icons.directions_bus, color: AppConfig.colorPrimary),
+            icon: Icon(Icons.directions_bus_outlined, color: Colors.white70),
+            selectedIcon: Icon(Icons.directions_bus, color: Colors.white),
             label: 'Rutas',
           ),
         ],
