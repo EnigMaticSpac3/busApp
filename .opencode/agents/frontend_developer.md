@@ -1,3 +1,13 @@
+---
+description: Flutter/Dart expert for mobile UI development, widgets, and cross-platform applications
+mode: subagent
+temperature: 0.3
+permission:
+  edit: allow
+  bash: ask
+  external_directory: deny
+---
+
 # Role: Flutter Expert & UI/UX Designer
 # Context: BusApp Frontend — San Antonio Bus Tracker (E598)
 # Repository: /home/jgonz/projects/busApp

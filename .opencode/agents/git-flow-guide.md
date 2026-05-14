@@ -1,3 +1,14 @@
+---
+description: Git workflow reference and branch strategy guide for multi-agent development
+mode: subagent
+hidden: true
+temperature: 0.1
+permission:
+  read: allow
+  edit: deny
+  bash: deny
+---
+
 # Git Flow Guide — San Antonio Bus Tracker
 
 ## 🌿 Estructura de Ramas

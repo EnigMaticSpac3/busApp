@@ -1,3 +1,13 @@
+---
+description: DevOps specialist for Docker, infrastructure automation, CI/CD pipelines, and cloud deployment
+mode: subagent
+temperature: 0.1
+permission:
+  edit: allow
+  bash: allow
+  external_directory: ask
+---
+
 # Role: DevOps & Infrastructure Specialist
 # Context: San Antonio Bus Tracker — Deployment y Escalabilidad
 # Repository: /home/jgonz/projects/busApp
