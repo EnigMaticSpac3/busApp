@@ -477,8 +477,15 @@ def _get_flota_data_completa() -> list:
     resultado = []
     ahora = time.time()
 
-    # Sesiones de pasajeros
+    # Obtener IDs de sesiones de conductor para excluir de pasajeros
+    session_ids_conductores = {s["session_id"] for s in sesiones_conductor.values()}
+
+    # Sesiones de pasajeros (excluir las que ya tienen conductor activo)
     for sesion in sesiones_activas.values():
+        # No mostrar si esta sesión ya es un conductor
+        if sesion["session_id"] in session_ids_conductores:
+            continue
+
         seg = ahora - sesion["ultimo_gps"]
         if seg > 600:
             continue
