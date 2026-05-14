@@ -26,3 +26,7 @@ build/
 # Datos temporales o locales
 *.gpx
 !gtfs_san_antonio/*.txt  # Queremos ignorar GPX pero guardar el GTFS generado
+
+# Otros archivos
+**/data
+**/skills/**/scripts

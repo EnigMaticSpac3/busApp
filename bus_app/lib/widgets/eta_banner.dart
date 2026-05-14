@@ -1,4 +1,7 @@
 // lib/widgets/eta_banner.dart
+//
+// Banner que muestra el ETA del próximo bus.
+// Incluye indicador de conexión WebSocket.
 
 import 'package:flutter/material.dart';
 import '../config/app_config.dart';
@@ -8,8 +11,15 @@ class EtaBanner extends StatelessWidget {
   final EtaParada? eta;
   final bool cargando;
   final String? busId;
+  final bool? webSocketConectado;
 
-  const EtaBanner({super.key, this.eta, this.cargando = false, this.busId});
+  const EtaBanner({
+    super.key,
+    this.eta,
+    this.cargando = false,
+    this.busId,
+    this.webSocketConectado,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +30,10 @@ class EtaBanner extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          if (webSocketConectado != null) ...[
+            _buildConnectionIndicator(),
+            const SizedBox(width: 8),
+          ],
           Icon(_icono, size: 18, color: Colors.black87),
           const SizedBox(width: 8),
           Flexible(
@@ -38,6 +52,38 @@ class EtaBanner extends StatelessWidget {
     );
   }
 
+  Widget _buildConnectionIndicator() {
+    final connected = webSocketConectado ?? false;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: connected
+            ? Colors.green.withValues(alpha: 0.2)
+            : Colors.orange.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            connected ? Icons.wifi : Icons.wifi_off,
+            size: 12,
+            color: connected ? Colors.green : Colors.orange,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            connected ? 'WS' : 'HTTP',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: connected ? Colors.green : Colors.orange,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   String get _texto {
     final id = busId ?? 'Bus';
     if (cargando) return 'Conectando con el servidor...';
@@ -49,7 +95,6 @@ class EtaBanner extends StatelessWidget {
   Color get _colorFondo {
     if (cargando || eta == null) return AppConfig.surfaceSecondary;
     if (eta!.esFinDeRecorrido) return AppConfig.surfaceWarning;
-    // ETA < 5 min → alerta (naranja), ETA normal → acento (lime)
     if (_esEtaCorto) return AppConfig.surfaceWarning;
     return AppConfig.surfaceSuccess;
   }
@@ -57,7 +102,6 @@ class EtaBanner extends StatelessWidget {
   bool get _esEtaCorto {
     if (eta == null) return false;
     final etaStr = eta!.eta.toLowerCase();
-    // Detecta "1 min", "2 min", "3 min", "4 min", "5 min" o "llegando"
     final match = RegExp(r'(\d+)\s*min').firstMatch(etaStr);
     if (match != null) {
       final minutos = int.tryParse(match.group(1)!) ?? 999;

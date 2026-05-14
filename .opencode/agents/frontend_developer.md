@@ -435,13 +435,26 @@ enum Modo { pasajero, conductor }
 ## 🤖 Modelos y Skills Recomendados
 
 ### Modelo de IA (por complejidad de tarea)
-| Tarea | Modelo Recomendado | Alternativa |
-|-------|-------------------|------------|
-| UI compleja, navegación, Dart avanzado | **GPT-4o** | GPT-4.1 |
-| Tareas simples (UI tweaks, widgets) | **GPT-4o** | MiniMax M2.5 |
-| Fallback (cuando se agoten créditos) | **MiniMax M2.5** | Siempre disponible |
+| Tarea | Modelo Recomendado | Alternativa | Disponibilidad |
+|-------|-------------------|------------|-----------------|
+| UI compleja, navegación, Dart avanzado | **MiniMax M2.7** | Claude Sonnet 4.5 | ✅ De pago |
+| Tareas simples (UI tweaks, widgets) | **MiniMax M2.5 Free** | DeepSeek V4 Flash Free | ✅ Gratis |
+| Fallback | **MiniMax M2.5 Free** | Siempre disponible | ✅ Gratis |
 
-**Recomendación:** Usa GPT-4o desde GitHub Copilot para tareas de Flutter/Dart (background GPS, autenticación, UI conductor). GPT-4o tiene mejor contexto del ecosistema Dart que otros modelos.
+**IMPORTANTE:** Los modelos de GitHub Copilot (GPT-4o, GPT-4.1) ya no están disponibles. Usar exclusivamente modelos de OpenCode Zen gratuitos: `minimax/m2.5-free` o `deepseek/v4-flash-free`.
+
+### Skills recomendadas
+| Fase | Skill | Estado |
+|------|-------|--------|
+| v5A | `flutter-background-location` | A buscar |
+| v4 | `websocket-optimization` | A buscar |
+| General | `flutter-development` | A buscar |
+| Actual | `flutter-add-widget-test` | ✅ Instalada |
+| UI/UX | `sleek-design-mobile-apps` | ✅ Instalada |
+| UI/UX | `ui-ux-pro-max` | ✅ Instalada |
+| Layout | `flutter-fix-layout-issues` | ✅ Instalada |
+| Layout | `flutter-build-responsive-layout` | ✅ Instalada |
+| Arquitectura | `flutter-apply-architecture-best-practices` | ✅ Instalada |
 
 ### Skills recomendadas
 | Fase | Skill | Comando |

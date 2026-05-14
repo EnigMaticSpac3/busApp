@@ -201,23 +201,41 @@ wscat -c ws://localhost:8000/ws/flota
 
 ## 🤖 Modelos de IA Recomendados (por agente)
 
-| Agente | Modelo Principal | Alternativa | Fallback |
-|--------|------------------|------------|----------|
-| **Backend** (FastAPI, Python) | GPT-4.1 | Deepseek V4 Flash | MiniMax M2.5 |
-| **Frontend** (Flutter, Dart, UI) | GPT-4o | GPT-4.1 | MiniMax M2.5 |
-| **DevOps** (Docker, infraestructura) | Deepseek V4 Flash | MiniMax M2.5 | Siempre disponible |
-| **Documentación** (.md, planning) | GPT-5-mini | Deepseek V4 Flash | MiniMax M2.5 |
+| Agente | Modelo Principal | Alternativa | Disponibilidad |
+|--------|------------------|-------------|----------------|
+| **Backend** (FastAPI, Python) | MiniMax M2.5 Free | DeepSeek V4 Flash Free | ✅ Gratis |
+| **Frontend** (Flutter, Dart, UI) | MiniMax M2.5 Free | DeepSeek V4 Flash Free | ✅ Gratis |
+| **DevOps** (Docker, infraestructura) | DeepSeek V4 Flash Free | MiniMax M2.5 Free | ✅ Gratis |
+| **Documentación** (.md, planning) | MiniMax M2.5 Free | DeepSeek V4 Flash Free | ✅ Gratis |
 
-**Nota:** GitHub Copilot proporciona acceso gratuito a GPT-4.1 y GPT-4o. Cuando se agoten los créditos, usa Deepseek V4 Flash como alternativa.
+**IMPORTANTE:** Los modelos de GitHub Copilot (GPT-4.1, GPT-4o) ya no están disponibles. **Usar exclusivamente** modelos de OpenCode Zen gratuitos configurando en OpenCode:
+- `minimax/m2.5-free` (recomendado)
+- `deepseek/v4-flash-free`
+
+**No usar:** GPT-4.1, GPT-4o, Claude Sonnet (a menos que pagues)
 
 ---
 
 ## 📦 Skills Recomendadas (por fase)
 
 ### Instaladas Actualmente ✅
+
+**Flutter/Dart (Oficiales - Google):**
+- `flutter-add-widget-test` — Tests de widgets en Flutter
+- `flutter-fix-layout-issues` — Corrige overflow y constraints
+- `flutter-build-responsive-layout` — MediaQuery/LayoutBuilder
+- `flutter-apply-architecture-best-practices` — Arquitectura en capas
+- `flutter-implement-json-serialization` — fromJson/toJson
+- `flutter-add-integration-test` — Pruebas de integración
+- `flutter-add-widget-preview` — Previews de widgets
+
+**UI/UX:**
+- `sleek-design-mobile-apps` — Mobile-first, gestos, safe areas
+- `ui-ux-pro-max` — Patrones UI/UX avanzados
+
+**Backend/DevOps:**
 - `devops-engineer` — Docker, CI/CD, infraestructura
 - `fastapi-python` — Backend FastAPI con async
-- `flutter-add-widget-test` — Tests de widgets en Flutter
 - `security-review` — Autenticación, APIs seguras
 - `find-skills` — Descubrir skills del ecosistema
 

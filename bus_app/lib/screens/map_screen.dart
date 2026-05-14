@@ -39,7 +39,7 @@ class _MapScreenState extends State<MapScreen> {
   final _api              = ApiService();
   final _crowdsourcing    = CrowdsourcingService();
   final _mapController    = MapController();
-  late final WebSocketService _wsService;
+  WebSocketService?        _wsService;
 
   // Estado del mapa
   List<LatLng> _routePoints = [];
@@ -66,6 +66,9 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     _crowdsourcing.addListener(_onCrowdsourcingChange);
+    _wsService = WebSocketService();
+    _wsService!.addListener(_onWsChange);
+    _iniciarWebSocket();
     _cargarRuta();
     _iniciarPolling();
     _iniciarUbicacion();
@@ -85,9 +88,23 @@ class _MapScreenState extends State<MapScreen> {
     _pollingTimer?.cancel();
     _locationSubscription?.cancel();
     _crowdsourcing.removeListener(_onCrowdsourcingChange);
-    _wsService.dispose();
+    _wsService?.removeListener(_onWsChange);
+    _wsService?.dispose();
     _crowdsourcing.dispose();
     super.dispose();
+  }
+
+  void _iniciarWebSocket() {
+    final wsUrl = AppConfig.backendUrl.replaceAll('https://', 'wss://').replaceAll('http://', 'ws://');
+    _wsService!.conectar('$wsUrl/ws/flota');
+  }
+
+  void _onWsChange() {
+    if (mounted) {
+      setState(() {
+        _flota = _wsService!.flota;
+      });
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -271,7 +288,12 @@ class _MapScreenState extends State<MapScreen> {
                 ],
               ),
             ),
-          EtaBanner(eta: _eta, cargando: _cargandoEta, busId: _currentSessionId),
+          EtaBanner(
+            eta: _eta,
+            cargando: _cargandoEta,
+            busId: _currentSessionId,
+            webSocketConectado: _wsService?.conectado,
+          ),
           Expanded(child: _buildMapOrState()),
         ],
       ),

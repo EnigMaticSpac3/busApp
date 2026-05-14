@@ -278,13 +278,23 @@ if sesion["tipo"] == "conductor" and tiempo_sin_senal > 30:
 ## 🤖 Modelos y Skills Recomendados
 
 ### Modelo de IA (por complejidad de tarea)
-| Tarea | Modelo Recomendado | Alternativa |
-|-------|-------------------|------------|
-| Lógica compleja (JWT, DB, map-matching) | **GPT-4.1** | Deepseek V4 Flash |
-| Tareas simples (bug fixes, refactoring) | **Deepseek V4 Flash** | MiniMax M2.5 |
-| Fallback (cuando se agoten créditos) | **MiniMax M2.5** | Siempre disponible |
+| Tarea | Modelo Recomendado | Alternativa | Disponibilidad |
+|-------|-------------------|------------|-----------------|
+| Lógica compleja (JWT, DB, map-matching) | **MiniMax M2.7** | MiniMax M2.5 Free | ✅ Disponible |
+| Tareas simples (bug fixes, refactoring) | **MiniMax M2.5 Free** | DeepSeek V4 Flash Free | ✅ Gratis |
+| Fallback | **MiniMax M2.5 Free** | Siempre disponible | ✅ Gratis |
 
-**Recomendación:** Usa GPT-4.1 desde GitHub Copilot para tareas de v5 (autenticación JWT, Dead Man's Switch). Cuando se agoten los créditos, cambia a Deepseek V4 Flash.
+**IMPORTANTE:** Los modelos de GitHub Copilot (GPT-4.1, GPT-4o) ya no están disponibles. Usar exclusivamente modelos de OpenCode Zen gratuitos: `minimax/m2.5-free` o `deepseek/v4-flash-free`.
+
+### Skills recomendadas
+| Fase | Skill | Estado |
+|------|-------|--------|
+| v5A | `jwt-authentication` | A buscar |
+| v5B | `firebase-fcm` | A buscar |
+| v5C | `opentrip-planner` | A buscar |
+| v5C | `postgis` | A buscar |
+| Actual | `fastapi-python` | ✅ Instalada |
+| Seguridad | `security-review` | ✅ Instalada (disponible para todos los agentes) |
 
 ### Skills recomendadas
 | Fase | Skill | Comando |

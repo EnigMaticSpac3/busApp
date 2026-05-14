@@ -159,13 +159,20 @@ Deployment prod     → Pendiente para cuando la app madure ⬜
 ## 🤖 Modelos y Skills Recomendados
 
 ### Modelo de IA (por complejidad de tarea)
-| Tarea | Modelo Recomendado | Alternativa |
-|-------|-------------------|------------|
-| Infraestructura simple (Docker, .env) | **Deepseek V4 Flash** | MiniMax M2.5 |
-| Deployment complejo (Fly.io, K8s) | **GPT-4.1** | Deepseek V4 Flash |
-| Fallback (cuando se agoten créditos) | **MiniMax M2.5** | Siempre disponible |
+| Tarea | Modelo Recomendado | Alternativa | Disponibilidad |
+|-------|-------------------|------------|-----------------|
+| Infraestructura simple (Docker, .env) | **DeepSeek V4 Flash Free** | MiniMax M2.5 Free | ✅ Gratis |
+| Deployment complejo (Fly.io, K8s) | **MiniMax M2.5 Free** | DeepSeek V4 Flash Free | ✅ Gratis |
+| Fallback | **MiniMax M2.5 Free** | Siempre disponible | ✅ Gratis |
 
-**Recomendación:** Usa Deepseek V4 Flash para tareas de DevOps. Son predecibles y no necesitan el modelo más potente. Ahorra GPT-4.1 para backend y frontend.
+**IMPORTANTE:** Los modelos de GitHub Copilot ya no están disponibles. Usar exclusivamente modelos de OpenCode Zen gratuitos: `minimax/m2.5-free` o `deepseek/v4-flash-free`.
+
+### Skills recomendadas
+| Fase | Skill | Estado |
+|------|-------|--------|
+| v5B | `firebase-fcm` | A buscar |
+| v5D | `fly-io-deployment` | A buscar |
+| Actual | `devops-engineer` | ✅ Instalada |
 
 ### Skills recomendadas
 | Fase | Skill | Comando |
