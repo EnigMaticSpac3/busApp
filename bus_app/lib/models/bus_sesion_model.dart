@@ -5,6 +5,7 @@
 
 class BusSesion {
   final String sessionId;
+  final String? rutaId;
   final double lat;
   final double lon;
   final double velMs;
@@ -13,6 +14,7 @@ class BusSesion {
 
   const BusSesion({
     required this.sessionId,
+    this.rutaId,
     required this.lat,
     required this.lon,
     required this.velMs,
@@ -23,6 +25,7 @@ class BusSesion {
   factory BusSesion.fromJson(Map<String, dynamic> json) {
     return BusSesion(
       sessionId: json['session_id'] as String? ?? json['id'] as String,
+      rutaId: json['ruta_id'] as String?,
       lat: (json['lat'] as num).toDouble(),
       lon: (json['lon'] as num).toDouble(),
       velMs: (json['vel_ms'] as num).toDouble(),

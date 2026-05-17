@@ -39,7 +39,7 @@ class _ConductorScreenState extends State<ConductorScreen> {
   DateTime? _inicioSesion;
   bool _deadManActivo = false;
 
-  static const int _deadManIntervalSeconds = 25;
+  static const int _deadManIntervalSeconds = 300; // 5 minutos
 
   @override
   void initState() {

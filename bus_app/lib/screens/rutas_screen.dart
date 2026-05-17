@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../config/app_config.dart';
+import '../models/bus_sesion_model.dart';
 import '../models/ruta_model.dart';
 import '../services/api_service.dart';
 import 'ruta_detalle_screen.dart';
@@ -21,25 +22,46 @@ class RutasScreen extends StatefulWidget {
 class _RutasScreenState extends State<RutasScreen> {
   final _api = ApiService();
   List<RutaModel> _rutas = [];
+  List<BusSesion> _flota = [];
   bool _cargando = true;
   String? _error;
   Timer? _pollingTimer;
+  Timer? _flotaTimer;
 
   @override
   void initState() {
     super.initState();
     _cargarRutas();
-    // Polling automático cada 5 segundos
+    // Polling automático cada 5 segundos para rutas
     _pollingTimer = Timer.periodic(
       const Duration(seconds: 5),
       (_) => _cargarRutas(soloActualizar: true),
     );
+    // Polling cada 10 segundos para flota
+    _flotaTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _cargarFlota(),
+    );
+    _cargarFlota();
   }
 
   @override
   void dispose() {
     _pollingTimer?.cancel();
+    _flotaTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _cargarFlota() async {
+    final flota = await _api.fetchFlota();
+    if (!mounted) return;
+    setState(() {
+      _flota = flota;
+    });
+  }
+
+  int _contarBusesActivos(String rutaId) {
+    return _flota.where((bus) => bus.rutaId == rutaId && bus.esActivo).length;
   }
 
   Future<void> _cargarRutas({bool soloActualizar = false}) async {
@@ -125,6 +147,9 @@ class _RutasScreenState extends State<RutasScreen> {
   }
 
   Widget _buildRutaCard(RutaModel ruta) {
+    final busesActivos = _contarBusesActivos(ruta.rutaId);
+    final tieneBuses = busesActivos > 0;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
@@ -185,16 +210,16 @@ class _RutasScreenState extends State<RutasScreen> {
                         Icon(
                           Icons.directions_bus,
                           size: 14,
-                          color: ruta.tieneBusesActivos
+                          color: tieneBuses
                               ? Colors.green
                               : Colors.grey,
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '${ruta.busesActivos} buses activos',
+                          '$busesActivos buses activos',
                           style: TextStyle(
                             fontSize: 13,
-                            color: ruta.tieneBusesActivos
+                            color: tieneBuses
                                 ? Colors.green.shade700
                                 : Colors.grey.shade600,
                           ),
@@ -208,7 +233,7 @@ class _RutasScreenState extends State<RutasScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: ruta.tieneBusesActivos
+                  color: tieneBuses
                       ? Colors.green.shade100
                       : Colors.grey.shade200,
                   borderRadius: BorderRadius.circular(12),
@@ -220,7 +245,7 @@ class _RutasScreenState extends State<RutasScreen> {
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: ruta.tieneBusesActivos
+                        color: tieneBuses
                             ? Colors.green
                             : Colors.grey,
                         shape: BoxShape.circle,
@@ -228,11 +253,11 @@ class _RutasScreenState extends State<RutasScreen> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      ruta.tieneBusesActivos ? 'Activa' : 'Sin servicio',
+                      tieneBuses ? 'Activa' : 'Sin servicio',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
-                        color: ruta.tieneBusesActivos
+                        color: tieneBuses
                             ? Colors.green.shade700
                             : Colors.grey.shade700,
                       ),
