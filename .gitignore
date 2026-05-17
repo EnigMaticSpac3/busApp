@@ -30,3 +30,6 @@ build/
 # Otros archivos
 **/data
 **/skills/**/scripts
+database/
+docs/
+**.docx**
