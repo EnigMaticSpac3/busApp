@@ -1,10 +1,8 @@
-// lib/screens/rutas_screen.dart
-//
-// Pantalla de selección de rutas - lista de rutas disponibles.
-
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../config/app_config.dart';
+import 'package:bus_app/theme/export.dart';
+import 'package:bus_app/widgets/route_badge.dart';
+import 'package:bus_app/widgets/empty_state.dart';
 import '../models/bus_sesion_model.dart';
 import '../models/ruta_model.dart';
 import '../services/api_service.dart';
@@ -32,12 +30,10 @@ class _RutasScreenState extends State<RutasScreen> {
   void initState() {
     super.initState();
     _cargarRutas();
-    // Polling automático cada 5 segundos para rutas
     _pollingTimer = Timer.periodic(
       const Duration(seconds: 5),
       (_) => _cargarRutas(soloActualizar: true),
     );
-    // Polling cada 10 segundos para flota
     _flotaTimer = Timer.periodic(
       const Duration(seconds: 10),
       (_) => _cargarFlota(),
@@ -88,9 +84,6 @@ class _RutasScreenState extends State<RutasScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rutas'),
-        backgroundColor: AppConfig.colorPrimary,
-        foregroundColor: Colors.white,
-        elevation: 0,
       ),
       body: _buildBody(),
     );
@@ -102,44 +95,25 @@ class _RutasScreenState extends State<RutasScreen> {
     }
 
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.grey),
-            const SizedBox(height: 12),
-            Text(_error!, style: const TextStyle(color: Colors.grey)),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _cargarRutas,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Reintentar'),
-            ),
-          ],
-        ),
+      return EmptyState(
+        icon: Icons.error_outline,
+        message: _error!,
+        actionLabel: 'Reintentar',
+        onAction: _cargarRutas,
       );
     }
 
     if (_rutas.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.directions_bus, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text(
-              'No hay rutas disponibles',
-              style: TextStyle(color: Colors.grey, fontSize: 16),
-            ),
-          ],
-        ),
+      return const EmptyState(
+        icon: Icons.directions_bus,
+        message: 'No hay rutas disponibles',
       );
     }
 
     return RefreshIndicator(
-      onRefresh: _cargarRutas,
+      onRefresh: () => _cargarRutas(),
       child: ListView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         itemCount: _rutas.length,
         itemBuilder: (context, index) => _buildRutaCard(_rutas[index]),
       ),
@@ -151,10 +125,10 @@ class _RutasScreenState extends State<RutasScreen> {
     final tieneBuses = busesActivos > 0;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(AppRadius.medium),
+        side: BorderSide(color: AppColors.gray300.withValues(alpha: 0.3)),
       ),
       child: InkWell(
         onTap: () {
@@ -170,58 +144,35 @@ class _RutasScreenState extends State<RutasScreen> {
             ),
           );
         },
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.medium),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Row(
             children: [
-              // Código de ruta
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppConfig.colorAccent,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  ruta.codigo,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: AppConfig.colorPrimary,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              // Nombre y buses activos
+              RouteBadge(codigo: ruta.codigo, fontSize: 16),
+              const SizedBox(width: AppSpacing.lg),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       ruta.nombre,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                      ),
+                      style: AppTypography.textTheme.titleMedium,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xs),
                     Row(
                       children: [
                         Icon(
                           Icons.directions_bus,
                           size: 14,
-                          color: tieneBuses
-                              ? Colors.green
-                              : Colors.grey,
+                          color: tieneBuses ? AppColors.accent : AppColors.textSecondary,
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: AppSpacing.xs),
                         Text(
                           '$busesActivos buses activos',
                           style: TextStyle(
                             fontSize: 13,
-                            color: tieneBuses
-                                ? Colors.green.shade700
-                                : Colors.grey.shade600,
+                            color: tieneBuses ? AppColors.accent : AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -229,14 +180,11 @@ class _RutasScreenState extends State<RutasScreen> {
                   ],
                 ),
               ),
-              // Badge de estado
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                 decoration: BoxDecoration(
-                  color: tieneBuses
-                      ? Colors.green.shade100
-                      : Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(12),
+                  color: tieneBuses ? AppColors.lime50 : AppColors.gray50,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -245,28 +193,24 @@ class _RutasScreenState extends State<RutasScreen> {
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: tieneBuses
-                            ? Colors.green
-                            : Colors.grey,
+                        color: tieneBuses ? AppColors.accent : AppColors.textSecondary,
                         shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: AppSpacing.xs),
                     Text(
                       tieneBuses ? 'Activa' : 'Sin servicio',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
-                        color: tieneBuses
-                            ? Colors.green.shade700
-                            : Colors.grey.shade700,
+                        color: tieneBuses ? AppColors.accent : AppColors.textSecondary,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right, color: Colors.grey),
+              const SizedBox(width: AppSpacing.sm),
+              const Icon(Icons.chevron_right, color: AppColors.textSecondary),
             ],
           ),
         ),
