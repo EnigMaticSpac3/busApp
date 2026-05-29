@@ -84,6 +84,13 @@ class _RutasScreenState extends State<RutasScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rutas'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.admin_panel_settings),
+            tooltip: 'Acceso conductor',
+            onPressed: () => Navigator.pushNamed(context, '/conductor-login'),
+          ),
+        ],
       ),
       body: _buildBody(),
     );

@@ -17,9 +17,11 @@ import '../widgets/eta_banner.dart';
 import '../widgets/seleccionar_ruta_sheet.dart';
 import '../widgets/subida_bus_sheet.dart';
 import '../widgets/app_search_bar.dart';
+import '../widgets/contribuir_fab.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_banner.dart';
 import '../widgets/floating_map_button.dart';
+import '../widgets/user_location_marker.dart';
 import '../theme/export.dart';
 
 class MapScreen extends StatefulWidget {
@@ -267,21 +269,11 @@ class _MapScreenState extends State<MapScreen> {
               onPressed: _centrarEnUsuario,
             ),
           ),
-        FloatingActionButton.extended(
-          heroTag: 'contribuir',
+        ContribuirFab(
+          activo: activo,
+          busId: busId,
+          ignorado: ignorado,
           onPressed: _toggleContribucion,
-          tooltip: activo ? 'Detener contribución GPS' : 'Iniciar contribución GPS',
-          backgroundColor: activo ? AppColors.accent : AppColors.primary,
-          icon: Icon(
-            activo ? Icons.location_on : Icons.location_off,
-            color: activo ? AppColors.primary : AppColors.white,
-          ),
-          label: Text(
-            activo
-                ? (busId != null ? 'En $busId' : (ignorado ? 'Buscando bus...' : 'Contribuyendo'))
-                : 'Contribuir',
-            style: AppTypography.textTheme.labelLarge,
-          ),
         ),
       ],
     );
@@ -334,16 +326,7 @@ class _MapScreenState extends State<MapScreen> {
                 if (_posicionUsuario != null)
                   Marker(
                     point: _posicionUsuario!,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.white, width: 2),
-                        boxShadow: [AppShadows.shadowSm],
-                      ),
-                      width: 16,
-                      height: 16,
-                    ),
+                    child: const UserLocationMarker(),
                   ),
               ],
             ),
@@ -361,17 +344,9 @@ class _MapScreenState extends State<MapScreen> {
             bottom: 80,
             left: AppSpacing.lg,
             right: AppSpacing.lg,
-            child: Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppColors.gray900,
-                borderRadius: BorderRadius.circular(AppRadius.small),
-              ),
-              child: Text(
-                "No hay buses activos en este momento.\nSé el primero en contribuir.",
-                style: AppTypography.textTheme.bodyLarge?.copyWith(color: AppColors.white),
-                textAlign: TextAlign.center,
-              ),
+            child: EmptyState(
+              icon: Icons.directions_bus_outlined,
+              message: 'No hay buses activos en este momento.\nSé el primero en contribuir.',
             ),
           ),
       ],

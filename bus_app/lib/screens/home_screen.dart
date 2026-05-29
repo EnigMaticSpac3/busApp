@@ -23,23 +23,9 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _navegarAConductorLogin() {
-    Navigator.pushNamed(context, '/conductor-login');
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('San Antonio Bus Tracker'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.admin_panel_settings),
-            tooltip: 'Acceso conductor',
-            onPressed: _navegarAConductorLogin,
-          ),
-        ],
-      ),
       body: IndexedStack(
         index: _tabIndex,
         children: [
