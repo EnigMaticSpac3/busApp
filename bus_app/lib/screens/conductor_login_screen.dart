@@ -1,11 +1,6 @@
-// lib/screens/conductor_login_screen.dart
-//
-// Pantalla de login para conductores con PIN de 4 dígitos.
-// UI/UX mejorada: teclado numérico, validación en tiempo real, errores claros.
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../config/app_config.dart';
+import 'package:bus_app/theme/export.dart';
 import '../services/auth_service.dart';
 
 class ConductorLoginScreen extends StatefulWidget {
@@ -102,21 +97,21 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppConfig.colorPrimary,
+      backgroundColor: AppColors.primary,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(AppSpacing.xxl),
           child: Column(
             children: [
               const Spacer(flex: 1),
               _buildHeader(),
               const SizedBox(height: 48),
               _buildPinInput(),
-              const SizedBox(height: 24),
+              const SizedBox(height: AppSpacing.xxl),
               _buildErrorMessage(),
               const Spacer(flex: 1),
               _buildLoginButton(),
-              const SizedBox(height: 24),
+              const SizedBox(height: AppSpacing.xxl),
               _buildBackButton(),
               const Spacer(flex: 1),
             ],
@@ -133,11 +128,11 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
           width: 100,
           height: 100,
           decoration: BoxDecoration(
-            color: AppConfig.colorAccent,
+            color: AppColors.accent,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: AppConfig.colorAccent.withValues(alpha: 0.3),
+                color: AppColors.accent.withValues(alpha: 0.3),
                 blurRadius: 20,
                 spreadRadius: 5,
               ),
@@ -146,10 +141,10 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
           child: const Icon(
             Icons.directions_bus,
             size: 60,
-            color: AppConfig.colorPrimary,
+            color: AppColors.primary,
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: AppSpacing.xxl),
         const Text(
           'Conductor',
           style: TextStyle(
@@ -158,7 +153,7 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
             color: Colors.white,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
         Text(
           'Ingresa tu PIN de 4 dígitos',
           style: TextStyle(
@@ -171,52 +166,48 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
   }
 
   Widget _buildPinInput() {
-    return Column(
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: _hasError
-                  ? AppConfig.colorAlert
-                  : Colors.white.withValues(alpha: 0.5),
-              width: 2,
-            ),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppRadius.medium),
+        border: Border.all(
+          color: _hasError
+              ? AppColors.alert
+              : Colors.white.withValues(alpha: 0.5),
+          width: 2,
+        ),
+      ),
+      child: TextField(
+        controller: _pinController,
+        keyboardType: TextInputType.number,
+        textAlign: TextAlign.center,
+        maxLength: 4,
+        obscureText: true,
+        style: const TextStyle(
+          fontSize: 32,
+          letterSpacing: 24,
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(4),
+        ],
+        decoration: InputDecoration(
+          hintText: '\u2022\u2022\u2022\u2022',
+          hintStyle: TextStyle(
+            color: Colors.white.withValues(alpha: 0.5),
+            letterSpacing: 24,
+            fontSize: 32,
           ),
-          child: TextField(
-            controller: _pinController,
-            keyboardType: TextInputType.number,
-            textAlign: TextAlign.center,
-            maxLength: 4,
-            obscureText: true,
-            style: const TextStyle(
-              fontSize: 32,
-              letterSpacing: 24,
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(4),
-            ],
-            decoration: InputDecoration(
-              hintText: '••••',
-              hintStyle: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
-                letterSpacing: 24,
-                fontSize: 32,
-              ),
-              counterText: '',
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 20,
-              ),
-            ),
+          counterText: '',
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xxl,
+            vertical: AppSpacing.xl,
           ),
         ),
-      ],
+      ),
     );
   }
 
@@ -225,12 +216,12 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppConfig.colorAlert.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.alert.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(AppRadius.small),
         border: Border.all(
-          color: AppConfig.colorAlert.withValues(alpha: 0.5),
+          color: AppColors.alert.withValues(alpha: 0.5),
         ),
       ),
       child: Row(
@@ -238,15 +229,15 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
         children: [
           const Icon(
             Icons.error_outline,
-            color: AppConfig.colorAlert,
+            color: AppColors.alert,
             size: 20,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
           Flexible(
             child: Text(
               _error!,
               style: const TextStyle(
-                color: AppConfig.colorAlert,
+                color: AppColors.alert,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),
@@ -267,14 +258,14 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
         onPressed: (_isLoading || !isValid) ? null : _login,
         style: ElevatedButton.styleFrom(
           backgroundColor: isValid
-              ? AppConfig.colorAccent
+              ? AppColors.accent
               : Colors.white.withValues(alpha: 0.2),
           foregroundColor: isValid
-              ? AppConfig.colorPrimary
+              ? AppColors.primary
               : Colors.white.withValues(alpha: 0.5),
           padding: const EdgeInsets.symmetric(vertical: 18),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.small),
           ),
         ),
         child: _isLoading
@@ -283,14 +274,14 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
                 height: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: AppConfig.colorPrimary,
+                  color: AppColors.primary,
                 ),
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.login, size: 24),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
                   const Text(
                     'Iniciar Sesión',
                     style: TextStyle(
@@ -315,7 +306,7 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
             color: Colors.white.withValues(alpha: 0.9),
             size: 20,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.xs),
           Text(
             'Volver',
             style: TextStyle(

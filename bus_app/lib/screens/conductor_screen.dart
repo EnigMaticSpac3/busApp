@@ -1,12 +1,7 @@
-// lib/screens/conductor_screen.dart
-//
-// Pantalla del conductor - modo minimalista para tracking GPS.
-// UI/UX mejorada: velocidad, duración, contador, Dead Man's Switch.
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import '../config/app_config.dart';
+import 'package:bus_app/theme/export.dart';
 import '../services/api_service.dart';
 
 class ConductorScreen extends StatefulWidget {
@@ -39,7 +34,7 @@ class _ConductorScreenState extends State<ConductorScreen> {
   DateTime? _inicioSesion;
   bool _deadManActivo = false;
 
-  static const int _deadManIntervalSeconds = 300; // 5 minutos
+  static const int _deadManIntervalSeconds = 300;
 
   @override
   void initState() {
@@ -75,13 +70,13 @@ class _ConductorScreenState extends State<ConductorScreen> {
 
   String get _deadManTexto {
     if (!_isTracking) return 'Iniciar Seguimiento';
-    if (_deadManActivo) return '✅ Vivo';
-    return '⚠️ Tap para confirmar';
+    if (_deadManActivo) return 'Vivo';
+    return 'Tap para confirmar';
   }
 
   Color get _deadManColor {
-    if (!_isTracking) return AppConfig.colorAccent;
-    return _deadManActivo ? Colors.green : AppConfig.colorAlert;
+    if (!_isTracking) return AppColors.accent;
+    return _deadManActivo ? Colors.green : AppColors.alert;
   }
 
   Future<void> _checkPermissions() async {
@@ -168,10 +163,10 @@ class _ConductorScreenState extends State<ConductorScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text(
-          '⚠️ Confirma que estás activo',
+          'Confirma que estás activo',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        backgroundColor: AppConfig.colorAlert,
+        backgroundColor: AppColors.alert,
         duration: const Duration(seconds: 5),
         action: SnackBarAction(
           label: 'CONFIRMAR',
@@ -199,12 +194,9 @@ class _ConductorScreenState extends State<ConductorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppConfig.colorPrimary,
+      backgroundColor: AppColors.primary,
       appBar: AppBar(
         title: Text(widget.nombreConductor),
-        backgroundColor: AppConfig.colorPrimary,
-        foregroundColor: Colors.white,
-        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -218,21 +210,21 @@ class _ConductorScreenState extends State<ConductorScreen> {
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(AppSpacing.xl),
           child: Column(
             children: [
               _buildEstadoIndicator(),
-              const SizedBox(height: 24),
+              const SizedBox(height: AppSpacing.xxl),
               _buildMetricsRow(),
-              const SizedBox(height: 24),
+              const SizedBox(height: AppSpacing.xxl),
               _buildPositionInfo(),
               if (_error != null) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 _buildErrorBanner(),
               ],
               const Spacer(),
               _buildDeadManButton(),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
               _buildControlButton(),
             ],
           ),
@@ -243,14 +235,14 @@ class _ConductorScreenState extends State<ConductorScreen> {
 
   Widget _buildEstadoIndicator() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.md),
       decoration: BoxDecoration(
         color: _isTracking
             ? Colors.green.withValues(alpha: 0.2)
-            : Colors.grey.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(30),
+            : AppColors.gray300.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
         border: Border.all(
-          color: _isTracking ? Colors.green : Colors.grey,
+          color: _isTracking ? Colors.green : AppColors.gray300,
           width: 2,
         ),
       ),
@@ -262,7 +254,7 @@ class _ConductorScreenState extends State<ConductorScreen> {
             color: Colors.white,
             size: 24,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Text(
             _isTracking ? 'SESIÓN ACTIVA' : 'SESIÓN INACTIVA',
             style: const TextStyle(
@@ -306,15 +298,15 @@ class _ConductorScreenState extends State<ConductorScreen> {
     required String value,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.small),
       ),
       child: Column(
         children: [
-          Icon(icon, color: AppConfig.colorAccent, size: 20),
-          const SizedBox(height: 4),
+          Icon(icon, color: AppColors.accent, size: 20),
+          const SizedBox(height: AppSpacing.xs),
           Text(
             value,
             style: const TextStyle(
@@ -338,10 +330,10 @@ class _ConductorScreenState extends State<ConductorScreen> {
   Widget _buildPositionInfo() {
     if (_currentPosition == null) {
       return Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.small),
         ),
         child: const Text(
           'Sin ubicación disponible',
@@ -352,10 +344,10 @@ class _ConductorScreenState extends State<ConductorScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.small),
       ),
       child: Column(
         children: [
@@ -363,19 +355,19 @@ class _ConductorScreenState extends State<ConductorScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Icon(Icons.location_on, color: Colors.white70, size: 16),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xs),
               Text(
                 'Lat: ${_currentPosition!.latitude.toStringAsFixed(5)}',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.xs),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Icon(Icons.location_on, color: Colors.white70, size: 16),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xs),
               Text(
                 'Lon: ${_currentPosition!.longitude.toStringAsFixed(5)}',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
@@ -389,19 +381,19 @@ class _ConductorScreenState extends State<ConductorScreen> {
 
   Widget _buildErrorBanner() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
-        color: AppConfig.colorAlert.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(8),
+        color: AppColors.alert.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(AppRadius.small),
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber, color: AppConfig.colorAlert, size: 20),
-          const SizedBox(width: 8),
+          const Icon(Icons.warning_amber, color: AppColors.alert, size: 20),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               _error!,
-              style: const TextStyle(color: AppConfig.colorAlert, fontSize: 14),
+              style: const TextStyle(color: AppColors.alert, fontSize: 14),
             ),
           ),
         ],
@@ -417,9 +409,9 @@ class _ConductorScreenState extends State<ConductorScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: _deadManColor,
           foregroundColor: _isTracking ? Colors.white : Colors.grey,
-          padding: const EdgeInsets.symmetric(vertical: 20),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.small),
           ),
           disabledBackgroundColor: Colors.grey.withValues(alpha: 0.3),
         ),
@@ -430,7 +422,7 @@ class _ConductorScreenState extends State<ConductorScreen> {
               _deadManActivo ? Icons.check_circle : Icons.warning,
               size: 24,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Text(
               _deadManTexto,
               style: const TextStyle(
@@ -454,11 +446,11 @@ class _ConductorScreenState extends State<ConductorScreen> {
                 ? _stopTracking
                 : _startTracking,
         style: ElevatedButton.styleFrom(
-          backgroundColor: _isTracking ? Colors.red : AppConfig.colorAccent,
-          foregroundColor: _isTracking ? Colors.white : AppConfig.colorPrimary,
+          backgroundColor: _isTracking ? Colors.red : AppColors.accent,
+          foregroundColor: _isTracking ? Colors.white : AppColors.primary,
           padding: const EdgeInsets.symmetric(vertical: 18),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.small),
           ),
           disabledBackgroundColor: Colors.grey,
         ),

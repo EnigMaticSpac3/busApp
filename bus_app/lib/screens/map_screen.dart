@@ -1,5 +1,3 @@
-// lib/screens/map_screen.dart
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -13,11 +11,16 @@ import '../models/eta_model.dart';
 import '../services/api_service.dart';
 import '../services/crowdsourcing_service.dart';
 import '../services/websocket_service.dart';
-import '../widgets/bus_marker_animated.dart';
+import '../widgets/bus_marker_widget.dart';
 import '../widgets/crowdsourcing_sheet.dart';
 import '../widgets/eta_banner.dart';
 import '../widgets/seleccionar_ruta_sheet.dart';
 import '../widgets/subida_bus_sheet.dart';
+import '../widgets/app_search_bar.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/error_banner.dart';
+import '../widgets/floating_map_button.dart';
+import '../theme/export.dart';
 
 class MapScreen extends StatefulWidget {
   final LatLng? coordenadasIniciales;
@@ -41,7 +44,6 @@ class _MapScreenState extends State<MapScreen> {
   final _mapController    = MapController();
   WebSocketService?        _wsService;
 
-  // Estado del mapa
   List<LatLng> _routePoints = [];
   List<BusSesion> _flota = [];
   EtaParada?   _eta;
@@ -50,17 +52,12 @@ class _MapScreenState extends State<MapScreen> {
   bool         _mapaCentradoPorUsuario = true;
   Map<String, LatLng> _posicionesAnterioresBuses = {};
 
-  // Estado de carga
   bool    _cargandoRuta = true;
   bool    _cargandoEta  = true;
   String? _errorRuta;
 
   Timer? _pollingTimer;
   StreamSubscription<Position>? _locationSubscription;
-
-  // -------------------------------------------------------------------------
-  // Ciclo de vida
-  // -------------------------------------------------------------------------
 
   @override
   void initState() {
@@ -74,7 +71,6 @@ class _MapScreenState extends State<MapScreen> {
     _iniciarUbicacion();
     _mostrarSheetSiCorresponde();
 
-    // Si hay coordenadas iniciales (desde RutaDetalle), centrar el mapa
     if (widget.coordenadasIniciales != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _mapController.move(widget.coordenadasIniciales!, widget.zoomInicial);
@@ -107,23 +103,17 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Ubicación del usuario
-  // -------------------------------------------------------------------------
-
   Future<void> _iniciarUbicacion() async {
-    // Verificar permisos
     LocationPermission permiso = await Geolocator.checkPermission();
     if (permiso == LocationPermission.denied) {
       permiso = await Geolocator.requestPermission();
     }
     if (permiso == LocationPermission.deniedForever) return;
 
-    // Escuchar cambios de ubicación
     _locationSubscription = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 5, // metros
+        distanceFilter: 5,
       ),
     ).listen((Position posicion) {
       if (mounted) {
@@ -134,17 +124,11 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  // -------------------------------------------------------------------------
-  // Crowdsourcing
-  // -------------------------------------------------------------------------
-
-  /// Muestra el bottom sheet solo si el usuario nunca ha tomado una decisión.
   Future<void> _mostrarSheetSiCorresponde() async {
     final prefs = await SharedPreferences.getInstance();
     final yaDecidio = prefs.getBool('crowdsourcing_decidido') ?? false;
     if (yaDecidio || !mounted) return;
 
-    // Pequeña espera para que el mapa cargue primero
     await Future.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
 
@@ -154,7 +138,6 @@ class _MapScreenState extends State<MapScreen> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('crowdsourcing_decidido', true);
         if (mounted) Navigator.pop(context);
-        // Primero seleccionar la ruta
         await _seleccionarRutaYContinuar();
       },
       onAhora: () async {
@@ -165,17 +148,14 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  /// Flow: seleccionar ruta → confirmar subida al bus → iniciar contribución
   Future<void> _seleccionarRutaYContinuar() async {
     await SeleccionarRutaSheet.mostrar(
       context,
       onRutaSeleccionada: (ruta) async {
-        // Guardar ruta_id seleccionada
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('ruta_id', ruta.rutaId);
 
         if (!mounted) return;
-        // Mostrar confirmación de subida
         await SubidaBusSheet.mostrar(
           context,
           busId: null,
@@ -199,10 +179,6 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Mapa y polling
-  // -------------------------------------------------------------------------
-
   Future<void> _cargarRuta() async {
     final puntos = await _api.fetchRuta();
     if (!mounted) return;
@@ -211,7 +187,6 @@ class _MapScreenState extends State<MapScreen> {
       _errorRuta    = puntos.isEmpty ? 'No se pudo cargar la ruta' : null;
       _routePoints  = puntos;
     });
-    // Pasamos los puntos de la ruta al servicio de crowdsourcing para geofencing
     _crowdsourcing.setRutaPoints(puntos);
   }
 
@@ -231,7 +206,6 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _actualizarFlotaYEta() async {
-    // Guardar posiciones actuales ANTES de recibir nuevas para animación
     final posicionesActuales = <String, LatLng>{};
     for (final bus in _flota) {
       if (bus.lat != 0 && bus.lon != 0) {
@@ -239,10 +213,9 @@ class _MapScreenState extends State<MapScreen> {
       }
     }
 
-    // Usar session_id del estado, o desde SharedPreferences como fallback
     final prefs = await SharedPreferences.getInstance();
     final sessionId = _currentSessionId ?? prefs.getString('session_id');
-    final busId = sessionId ?? 'Bus'; // No hardcodear "Bus-01"
+    final busId = sessionId ?? 'Bus';
 
     final resultados = await Future.wait([
       _api.fetchFlota(),
@@ -257,37 +230,13 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  // -------------------------------------------------------------------------
-  // UI
-  // -------------------------------------------------------------------------
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Column(
         children: [
-          // Banner de salida de ruta
           if (_crowdsourcing.estado == EstadoContribucion.fueraRuta)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              width: double.infinity,
-              color: AppConfig.colorAlert50,
-              child: Row(
-                children: [
-                  Icon(Icons.warning_amber, color: AppConfig.colorAlert900, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Dejaste de contribuir (saliste de la ruta)',
-                      style: TextStyle(
-                        color: AppConfig.colorAlert900,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            ErrorBanner(message: 'Dejaste de contribuir (saliste de la ruta)'),
           EtaBanner(
             eta: _eta,
             cargando: _cargandoEta,
@@ -301,7 +250,6 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  /// Botones flotantes: contribuir (principal) y centrar mapa (secundario)
   Widget _buildFab() {
     final activo   = _crowdsourcing.estaActivo;
     final ignorado = _crowdsourcing.estado == EstadoContribucion.ignorado;
@@ -311,33 +259,28 @@ class _MapScreenState extends State<MapScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        // Botón centrar en mi ubicación (aparece si el usuario movió el mapa)
         if (!_mapaCentradoPorUsuario && _posicionUsuario != null)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: FloatingActionButton.small(
-              heroTag: 'centrar',
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: FloatingMapButton(
+              icon: Icons.my_location,
               onPressed: _centrarEnUsuario,
-              backgroundColor: Colors.white,
-              tooltip: 'Centrar en mi ubicación',
-              child: Icon(Icons.my_location, color: AppConfig.colorPrimary),
             ),
           ),
-        // Botón contribuir
         FloatingActionButton.extended(
           heroTag: 'contribuir',
           onPressed: _toggleContribucion,
           tooltip: activo ? 'Detener contribución GPS' : 'Iniciar contribución GPS',
-          backgroundColor: activo ? AppConfig.colorAccent : AppConfig.colorPrimary,
+          backgroundColor: activo ? AppColors.accent : AppColors.primary,
           icon: Icon(
             activo ? Icons.location_on : Icons.location_off,
-            color: activo ? AppConfig.colorPrimary : Colors.white,
+            color: activo ? AppColors.primary : AppColors.white,
           ),
           label: Text(
             activo
                 ? (busId != null ? 'En $busId' : (ignorado ? 'Buscando bus...' : 'Contribuyendo'))
                 : 'Contribuir',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: AppTypography.textTheme.labelLarge,
           ),
         ),
       ],
@@ -346,21 +289,11 @@ class _MapScreenState extends State<MapScreen> {
 
   Widget _buildMapOrState() {
     if (_errorRuta != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.wifi_off, size: 48, color: Colors.grey),
-            const SizedBox(height: 12),
-            Text(_errorRuta!, style: const TextStyle(color: Colors.grey)),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _cargarRuta,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Reintentar'),
-            ),
-          ],
-        ),
+      return EmptyState(
+        icon: Icons.wifi_off,
+        message: _errorRuta!,
+        actionLabel: 'Reintentar',
+        onAction: _cargarRuta,
       );
     }
 
@@ -390,22 +323,23 @@ class _MapScreenState extends State<MapScreen> {
               polylines: [
                 Polyline(
                   points: _routePoints,
-                  color: AppConfig.colorPrimary.withValues(alpha: 0.6),
+                  color: AppColors.primary.withValues(alpha: 0.6),
                   strokeWidth: 5,
                 ),
               ],
             ),
             MarkerLayer(
               markers: [
-                ...buildAnimatedBusMarkers(_flota, _posicionesAnterioresBuses),
+                ...buildBusMarkers(_flota, _posicionesAnterioresBuses),
                 if (_posicionUsuario != null)
                   Marker(
                     point: _posicionUsuario!,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.blue,
+                        color: AppColors.primary,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
+                        border: Border.all(color: AppColors.white, width: 2),
+                        boxShadow: [AppShadows.shadowSm],
                       ),
                       width: 16,
                       height: 16,
@@ -415,21 +349,27 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ],
         ),
-        // Mensaje cuando no hay buses activos
+        // SearchBar overlay
+        Positioned(
+          top: AppSpacing.md,
+          left: AppSpacing.lg,
+          right: AppSpacing.lg,
+          child: AppSearchBar(),
+        ),
         if (_flota.isEmpty && !_cargandoRuta)
           Positioned(
             bottom: 80,
-            left: 16,
-            right: 16,
+            left: AppSpacing.lg,
+            right: AppSpacing.lg,
             child: Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.gray900,
+                borderRadius: BorderRadius.circular(AppRadius.small),
               ),
-              child: const Text(
+              child: Text(
                 "No hay buses activos en este momento.\nSé el primero en contribuir.",
-                style: TextStyle(color: Colors.white),
+                style: AppTypography.textTheme.bodyLarge?.copyWith(color: AppColors.white),
                 textAlign: TextAlign.center,
               ),
             ),
