@@ -272,6 +272,17 @@ npx skills find flutter-development
 - devops-engineer
 - security-review
 
+## 🛡️ Seguridad npm (para todos los agentes)
+
+**Antecedentes:** Hubo brechas recientes en npm: cuenta del mantenedor de Axios comprometida (RATs, robo de credenciales), ataque gusano "Shai-Hulud", y campañas de phishing contra `chalk`, `debug`, etc.
+
+**Reglas obligatorias al tocar dependencias npm:**
+1. **Siempre commitear `package-lock.json`** — nunca hacer `.gitignore` del lockfile. Sin él no hay verificación de integridad.
+2. **Usar `npm ci`** en vez de `npm install` en CI/CD — `npm ci` usa exactamente lo que está en el lockfile, no resuelve versiones nuevas.
+3. **No instalar dependencias sin verificar** — revisar quién mantiene el paquete, cuántas descargas tiene, si tiene historial de seguridad.
+4. **`npm audit` después de cada `npm install`** — correrlo y revisar vulnerabilidades antes de commitear.
+5. **Pin versiones exactas** en `package.json` cuando sea posible (sin `^` ni `~`).
+
 ## Multi-Agent Workflow
 ```bash
 # Crear rama desde develop
