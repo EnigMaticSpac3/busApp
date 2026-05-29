@@ -1,10 +1,5 @@
-// lib/screens/home_screen.dart
-//
-// Pantalla principal con NavigationBar para cambiar entre Mapa y Rutas.
-
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
-import '../config/app_config.dart';
 import 'map_screen.dart';
 import 'rutas_screen.dart';
 
@@ -20,7 +15,6 @@ class _HomeScreenState extends State<HomeScreen> {
   LatLng? _coordenadasParaCentrar;
   double _zoomInicial = 16.0;
 
-  // Callback para centrar el mapa en una ubicación desde cualquier parte
   void _centrarEn(double lat, double lon, {double zoom = 16.0}) {
     setState(() {
       _tabIndex = 0;
@@ -37,8 +31,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppConfig.colorPrimary,
-        foregroundColor: Colors.white,
         title: const Text('San Antonio Bus Tracker'),
         actions: [
           IconButton(
@@ -64,18 +56,16 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tabIndex,
         onDestinationSelected: (i) => setState(() => _tabIndex = i),
-        backgroundColor: AppConfig.colorPrimary,
-        indicatorColor: Colors.white.withValues(alpha: 0.3),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.map_outlined, color: Colors.white70),
-            selectedIcon: Icon(Icons.map, color: Colors.white),
+            icon: Icon(Icons.map_outlined),
+            selectedIcon: Icon(Icons.map),
             label: 'Mapa',
           ),
           NavigationDestination(
-            icon: Icon(Icons.directions_bus_outlined, color: Colors.white70),
-            selectedIcon: Icon(Icons.directions_bus, color: Colors.white),
+            icon: Icon(Icons.directions_bus_outlined),
+            selectedIcon: Icon(Icons.directions_bus),
             label: 'Rutas',
           ),
         ],

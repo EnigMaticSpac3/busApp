@@ -1,10 +1,5 @@
-// lib/widgets/eta_banner.dart
-//
-// Banner que muestra el ETA del próximo bus.
-// Incluye indicador de conexión WebSocket.
-
 import 'package:flutter/material.dart';
-import '../config/app_config.dart';
+import 'package:bus_app/theme/export.dart';
 import '../models/eta_model.dart';
 
 class EtaBanner extends StatelessWidget {
@@ -24,7 +19,7 @@ class EtaBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
       width: double.infinity,
       color: _colorFondo,
       child: Row(
@@ -32,17 +27,15 @@ class EtaBanner extends StatelessWidget {
         children: [
           if (webSocketConectado != null) ...[
             _buildConnectionIndicator(),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.sm),
           ],
-          Icon(_icono, size: 18, color: Colors.black87),
-          const SizedBox(width: 8),
+          Icon(_icono, size: 18, color: AppColors.textPrimary),
+          const SizedBox(width: AppSpacing.sm),
           Flexible(
             child: Text(
               _texto,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-                color: Colors.black87,
+              style: AppTypography.textTheme.titleMedium?.copyWith(
+                color: AppColors.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -58,9 +51,9 @@ class EtaBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: connected
-            ? Colors.green.withValues(alpha: 0.2)
-            : Colors.orange.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(8),
+            ? AppColors.accent.withValues(alpha: 0.2)
+            : AppColors.alert.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(AppRadius.small),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -68,7 +61,7 @@ class EtaBanner extends StatelessWidget {
           Icon(
             connected ? Icons.wifi : Icons.wifi_off,
             size: 12,
-            color: connected ? Colors.green : Colors.orange,
+            color: connected ? AppColors.accent : AppColors.alert,
           ),
           const SizedBox(width: 4),
           Text(
@@ -76,7 +69,7 @@ class EtaBanner extends StatelessWidget {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: connected ? Colors.green : Colors.orange,
+              color: connected ? AppColors.accent : AppColors.alert,
             ),
           ),
         ],
@@ -93,10 +86,10 @@ class EtaBanner extends StatelessWidget {
   }
 
   Color get _colorFondo {
-    if (cargando || eta == null) return AppConfig.surfaceSecondary;
-    if (eta!.esFinDeRecorrido) return AppConfig.surfaceWarning;
-    if (_esEtaCorto) return AppConfig.surfaceWarning;
-    return AppConfig.surfaceSuccess;
+    if (cargando || eta == null) return AppColors.surface;
+    if (eta!.esFinDeRecorrido) return AppColors.orange50;
+    if (_esEtaCorto) return AppColors.orange50;
+    return AppColors.lime50;
   }
 
   bool get _esEtaCorto {
