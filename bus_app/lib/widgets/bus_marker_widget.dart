@@ -122,7 +122,7 @@ class _AnimatedBusMarkerState extends State<AnimatedBusMarker>
                 ),
                 child: const Icon(
                   Icons.directions_bus,
-                  color: AppColors.alert,
+                  color: AppColors.accent,
                   size: 24,
                 ),
               ),

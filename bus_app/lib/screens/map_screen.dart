@@ -13,7 +13,7 @@ import '../services/crowdsourcing_service.dart';
 import '../services/websocket_service.dart';
 import '../widgets/bus_marker_widget.dart';
 import '../widgets/crowdsourcing_sheet.dart';
-import '../widgets/eta_banner.dart';
+import '../widgets/collapsed_eta_card.dart';
 import '../widgets/seleccionar_ruta_sheet.dart';
 import '../widgets/subida_bus_sheet.dart';
 import '../widgets/app_search_bar.dart';
@@ -235,17 +235,24 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
+      body: Stack(
         children: [
+          Positioned.fill(child: _buildMapOrState()),
           if (_crowdsourcing.estado == EstadoContribucion.fueraRuta)
-            ErrorBanner(message: 'Dejaste de contribuir (saliste de la ruta)'),
-          EtaBanner(
-            eta: _eta,
-            cargando: _cargandoEta,
-            busId: _currentSessionId,
-            webSocketConectado: _wsService?.conectado,
+            Positioned(
+              top: 0, left: 0, right: 0,
+              child: ErrorBanner(message: 'Dejaste de contribuir (saliste de la ruta)'),
+            ),
+          Positioned(
+            left: 0, right: 0,
+            bottom: 100,
+            child: CollapsedEtaCard(
+              eta: _eta,
+              cargando: _cargandoEta,
+              busId: _currentSessionId,
+              webSocketConectado: _wsService?.conectado,
+            ),
           ),
-          Expanded(child: _buildMapOrState()),
         ],
       ),
       floatingActionButton: _buildFab(),

@@ -16,7 +16,7 @@ class AppSearchBar extends StatelessWidget {
     return Material(
       elevation: 4,
       borderRadius: BorderRadius.circular(AppRadius.pill),
-      shadowColor: Colors.black.withValues(alpha: 0.1),
+      shadowColor: AppColors.textPrimary.withValues(alpha: 0.1),
       child: Container(
         height: 56,
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),

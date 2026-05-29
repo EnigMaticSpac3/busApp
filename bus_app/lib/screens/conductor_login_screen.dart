@@ -150,7 +150,7 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: AppColors.white,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -158,7 +158,7 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
           'Ingresa tu PIN de 4 dígitos',
           style: TextStyle(
             fontSize: 16,
-            color: Colors.white.withValues(alpha: 0.8),
+            color: AppColors.white.withValues(alpha: 0.8),
           ),
         ),
       ],
@@ -168,12 +168,12 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
   Widget _buildPinInput() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
+        color: AppColors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppRadius.medium),
         border: Border.all(
           color: _hasError
               ? AppColors.alert
-              : Colors.white.withValues(alpha: 0.5),
+              : AppColors.white.withValues(alpha: 0.5),
           width: 2,
         ),
       ),
@@ -186,7 +186,7 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
         style: const TextStyle(
           fontSize: 32,
           letterSpacing: 24,
-          color: Colors.white,
+          color: AppColors.white,
           fontWeight: FontWeight.bold,
         ),
         inputFormatters: [
@@ -196,7 +196,7 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
         decoration: InputDecoration(
           hintText: '\u2022\u2022\u2022\u2022',
           hintStyle: TextStyle(
-            color: Colors.white.withValues(alpha: 0.5),
+            color: AppColors.white.withValues(alpha: 0.5),
             letterSpacing: 24,
             fontSize: 32,
           ),
@@ -259,10 +259,10 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: isValid
               ? AppColors.accent
-              : Colors.white.withValues(alpha: 0.2),
+              : AppColors.white.withValues(alpha: 0.2),
           foregroundColor: isValid
               ? AppColors.primary
-              : Colors.white.withValues(alpha: 0.5),
+              : AppColors.white.withValues(alpha: 0.5),
           padding: const EdgeInsets.symmetric(vertical: 18),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.small),
@@ -303,14 +303,14 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
         children: [
           Icon(
             Icons.arrow_back,
-            color: Colors.white.withValues(alpha: 0.9),
+            color: AppColors.white.withValues(alpha: 0.9),
             size: 20,
           ),
           const SizedBox(width: AppSpacing.xs),
           Text(
             'Volver',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.9),
+              color: AppColors.white.withValues(alpha: 0.9),
               fontSize: 16,
             ),
           ),

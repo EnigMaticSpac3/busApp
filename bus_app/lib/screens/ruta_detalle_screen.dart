@@ -151,8 +151,8 @@ class _RutaDetalleScreenState extends State<RutaDetalleScreen> {
                 polylines: [
                   Polyline(
                     points: stopPoints,
-                    color: AppColors.primary.withValues(alpha: 0.6),
-                    strokeWidth: 4,
+                    color: AppColors.primary.withValues(alpha: 0.7),
+                    strokeWidth: 5,
                   ),
                 ],
               ),
@@ -177,7 +177,7 @@ class _RutaDetalleScreenState extends State<RutaDetalleScreen> {
                     ),
                     child: Icon(
                       Icons.directions_bus,
-                      color: bus.esActivo ? AppColors.alert : AppColors.textSecondary,
+                      color: bus.esActivo ? AppColors.accent : AppColors.textSecondary,
                       size: 20,
                     ),
                   ),

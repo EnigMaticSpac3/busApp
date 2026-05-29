@@ -76,7 +76,7 @@ class _ConductorScreenState extends State<ConductorScreen> {
 
   Color get _deadManColor {
     if (!_isTracking) return AppColors.accent;
-    return _deadManActivo ? Colors.green : AppColors.alert;
+    return _deadManActivo ? AppColors.accent : AppColors.alert;
   }
 
   Future<void> _checkPermissions() async {
@@ -170,7 +170,7 @@ class _ConductorScreenState extends State<ConductorScreen> {
         duration: const Duration(seconds: 5),
         action: SnackBarAction(
           label: 'CONFIRMAR',
-          textColor: Colors.white,
+          textColor: AppColors.white,
           onPressed: _reiniciarDeadMan,
         ),
       ),
@@ -238,11 +238,11 @@ class _ConductorScreenState extends State<ConductorScreen> {
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.md),
       decoration: BoxDecoration(
         color: _isTracking
-            ? Colors.green.withValues(alpha: 0.2)
+            ? AppColors.accent.withValues(alpha: 0.2)
             : AppColors.gray300.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(AppRadius.pill),
         border: Border.all(
-          color: _isTracking ? Colors.green : AppColors.gray300,
+          color: _isTracking ? AppColors.accent : AppColors.gray300,
           width: 2,
         ),
       ),
@@ -251,14 +251,14 @@ class _ConductorScreenState extends State<ConductorScreen> {
         children: [
           Icon(
             _isTracking ? Icons.gps_fixed : Icons.gps_off,
-            color: Colors.white,
+            color: AppColors.white,
             size: 24,
           ),
           const SizedBox(width: AppSpacing.md),
           Text(
             _isTracking ? 'SESIÓN ACTIVA' : 'SESIÓN INACTIVA',
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: AppColors.white,
               fontWeight: FontWeight.bold,
               fontSize: 16,
               letterSpacing: 1,
@@ -300,7 +300,7 @@ class _ConductorScreenState extends State<ConductorScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
+          color: AppColors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppRadius.small),
       ),
       child: Column(
@@ -309,16 +309,14 @@ class _ConductorScreenState extends State<ConductorScreen> {
           const SizedBox(height: AppSpacing.xs),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
+            style: TextStyle(
+              color: AppColors.alert, fontSize: 14,
             ),
           ),
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.9),
+              color: AppColors.white.withValues(alpha: 0.9),
               fontSize: 12,
             ),
           ),
@@ -332,12 +330,12 @@ class _ConductorScreenState extends State<ConductorScreen> {
       return Container(
         padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
+          color: AppColors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(AppRadius.small),
         ),
-        child: const Text(
+        child: Text(
           'Sin ubicación disponible',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: AppColors.white.withValues(alpha: 0.7)),
           textAlign: TextAlign.center,
         ),
       );
@@ -346,7 +344,7 @@ class _ConductorScreenState extends State<ConductorScreen> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: AppColors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(AppRadius.small),
       ),
       child: Column(
@@ -354,11 +352,11 @@ class _ConductorScreenState extends State<ConductorScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.location_on, color: Colors.white70, size: 16),
+              Icon(Icons.location_on, color: AppColors.white.withValues(alpha: 0.7), size: 16),
               const SizedBox(width: AppSpacing.xs),
               Text(
                 'Lat: ${_currentPosition!.latitude.toStringAsFixed(5)}',
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
+                style: TextStyle(color: AppColors.white.withValues(alpha: 0.7), fontSize: 13),
               ),
             ],
           ),
@@ -366,11 +364,11 @@ class _ConductorScreenState extends State<ConductorScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.location_on, color: Colors.white70, size: 16),
+              Icon(Icons.location_on, color: AppColors.white.withValues(alpha: 0.7), size: 16),
               const SizedBox(width: AppSpacing.xs),
               Text(
                 'Lon: ${_currentPosition!.longitude.toStringAsFixed(5)}',
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
+                style: TextStyle(color: AppColors.white.withValues(alpha: 0.7), fontSize: 13),
               ),
             ],
           ),
@@ -408,12 +406,12 @@ class _ConductorScreenState extends State<ConductorScreen> {
         onPressed: _isTracking ? _reiniciarDeadMan : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: _deadManColor,
-          foregroundColor: _isTracking ? Colors.white : Colors.grey,
+          foregroundColor: _isTracking ? AppColors.white : AppColors.textSecondary,
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.small),
           ),
-          disabledBackgroundColor: Colors.grey.withValues(alpha: 0.3),
+          disabledBackgroundColor: AppColors.textSecondary.withValues(alpha: 0.3),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -425,10 +423,9 @@ class _ConductorScreenState extends State<ConductorScreen> {
             const SizedBox(width: AppSpacing.md),
             Text(
               _deadManTexto,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+          style: TextStyle(
+              color: AppColors.alert, fontSize: 14,
+            ),
             ),
           ],
         ),
@@ -446,13 +443,13 @@ class _ConductorScreenState extends State<ConductorScreen> {
                 ? _stopTracking
                 : _startTracking,
         style: ElevatedButton.styleFrom(
-          backgroundColor: _isTracking ? Colors.red : AppColors.accent,
-          foregroundColor: _isTracking ? Colors.white : AppColors.primary,
+          backgroundColor: _isTracking ? AppColors.alert : AppColors.accent,
+          foregroundColor: _isTracking ? AppColors.white : AppColors.primary,
           padding: const EdgeInsets.symmetric(vertical: 18),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.small),
           ),
-          disabledBackgroundColor: Colors.grey,
+          disabledBackgroundColor: AppColors.textSecondary,
         ),
         child: _isTracking
             ? const Row(
