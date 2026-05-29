@@ -1,7 +1,7 @@
 // lib/main.dart
 
 import 'package:flutter/material.dart';
-import 'config/app_config.dart';
+import 'theme/export.dart';
 import 'screens/home_screen.dart';
 import 'screens/conductor_login_screen.dart';
 import 'screens/conductor_screen.dart';
@@ -18,10 +18,7 @@ class BusApp extends StatelessWidget {
     return MaterialApp(
       title: 'San Antonio Bus Tracker',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: AppConfig.colorPrimary),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light,
       initialRoute: '/',
       routes: {
         '/': (context) => const HomeScreen(),
