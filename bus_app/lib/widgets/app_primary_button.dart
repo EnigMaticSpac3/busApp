@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:bus_app/theme/export.dart';
 
 class AppPrimaryButton extends StatelessWidget {
@@ -36,7 +37,20 @@ class AppPrimaryButton extends StatelessWidget {
         label: Text(isLoading ? 'Conectando...' : label),
         style: FilledButton.styleFrom(
           backgroundColor: backgroundColor ?? AppColors.primary,
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+          disabledBackgroundColor: AppColors.gray300,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xl,
+            vertical: AppSpacing.lg,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.medium),
+          ),
+          elevation: 2,
+          textStyle: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppColors.white,
+          ),
         ),
       ),
     );
