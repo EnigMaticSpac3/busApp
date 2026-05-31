@@ -99,31 +99,38 @@ class _AnimatedBusMarkerState extends State<AnimatedBusMarker>
                 ),
               if (widget.bus.esActivo)
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.accent.withValues(alpha: 0.4),
-                        blurRadius: 12,
-                        spreadRadius: 2,
+                        color: AppColors.accent.withValues(alpha: 0.3),
+                        blurRadius: 14,
+                        spreadRadius: 3,
                       ),
                     ],
                   ),
                 ),
               Container(
-                width: 36,
-                height: 36,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: AppColors.white,
+                  color: AppColors.accent,
                   shape: BoxShape.circle,
-                  boxShadow: [AppShadows.shadowMd],
+                  border: Border.all(color: AppColors.white, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.accent.withValues(alpha: 0.4),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ],
                 ),
                 child: const Icon(
                   Icons.directions_bus,
-                  color: AppColors.accent,
-                  size: 24,
+                  color: AppColors.white,
+                  size: 22,
                 ),
               ),
             ],
