@@ -268,39 +268,48 @@ class _RutaDetalleScreenState extends State<RutaDetalleScreen> {
   }
 
   Widget _buildParadaItem(ParadaModel parada) {
-    return InkWell(
-      onTap: () => _centrarEnParada(parada.lat, parada.lon),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  '${parada.orden}',
-                  style: AppTypography.textTheme.labelLarge?.copyWith(
-                    color: AppColors.primary,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: InkWell(
+        onTap: () => _centrarEnParada(parada.lat, parada.lon),
+        borderRadius: BorderRadius.circular(AppRadius.medium),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(AppRadius.medium),
+            boxShadow: [AppShadows.shadowSm],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    '${parada.orden}',
+                    style: AppTypography.textTheme.labelLarge?.copyWith(
+                      color: AppColors.primary,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Text(
-                parada.nombre,
-                style: AppTypography.textTheme.bodyLarge,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  parada.nombre,
+                  style: AppTypography.textTheme.bodyLarge,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-            Icon(Icons.chevron_right, color: AppColors.textSecondary, size: 20),
-          ],
+              Icon(Icons.chevron_right, color: AppColors.textSecondary, size: 20),
+            ],
+          ),
         ),
       ),
     );
@@ -315,18 +324,17 @@ class _StopMarker extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: AppColors.primary,
         shape: BoxShape.circle,
-        border: Border.all(color: AppColors.primary, width: 2),
         boxShadow: [AppShadows.shadowSm],
       ),
       child: Center(
         child: Text(
           '$orden',
-          style: TextStyle(
-            fontSize: 10,
+          style: const TextStyle(
+            fontSize: 11,
             fontWeight: FontWeight.bold,
-            color: AppColors.primary,
+            color: AppColors.white,
           ),
         ),
       ),

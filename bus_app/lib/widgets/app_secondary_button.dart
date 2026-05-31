@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:bus_app/theme/export.dart';
 
 class AppSecondaryButton extends StatelessWidget {
@@ -19,13 +20,15 @@ class AppSecondaryButton extends StatelessWidget {
       width: double.infinity,
       child: TextButton(
         onPressed: onPressed,
-        child: Text(
-          label,
-          style: TextStyle(
-            color: textColor ?? AppColors.textSecondary,
+        style: TextButton.styleFrom(
+          foregroundColor: textColor ?? AppColors.primary,
+          textStyle: GoogleFonts.inter(
             fontSize: 14,
+            fontWeight: FontWeight.w500,
           ),
+          padding: EdgeInsets.zero,
         ),
+        child: Text(label),
       ),
     );
   }
