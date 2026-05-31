@@ -12,6 +12,7 @@ class AppBottomSheet extends StatelessWidget {
       isScrollControlled: true,
       isDismissible: false,
       enableDrag: false,
+      elevation: 4,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.large)),
       ),
