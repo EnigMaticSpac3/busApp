@@ -102,77 +102,88 @@ class StopDetailSheet extends StatelessWidget {
     final bgColor = _etaBgColor(eta.minutos);
     final etaColor = _etaTextColor(eta.minutos);
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(AppRadius.medium),
-          boxShadow: [AppShadows.shadowSm],
-        ),
-        child: Row(
-          children: [
-            RouteBadge(codigo: eta.rutaCodigo),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    eta.destino,
-                    style: AppTypography.textTheme.titleMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Row(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 0),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(AppRadius.medium),
+              boxShadow: [AppShadows.shadowSm],
+            ),
+            child: Row(
+              children: [
+                RouteBadge(codigo: eta.rutaCodigo),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.directions_bus, size: 12, color: AppColors.textSecondary),
-                      const SizedBox(width: 4),
                       Text(
-                        'En tiempo real',
-                        style: AppTypography.textTheme.labelMedium,
+                        eta.destino,
+                        style: AppTypography.textTheme.titleMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Row(
+                        children: [
+                          Icon(Icons.directions_bus, size: 12, color: AppColors.textSecondary),
+                          const SizedBox(width: 4),
+                          Text(
+                            'En tiempo real',
+                            style: AppTypography.textTheme.labelMedium,
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            if (eta.minutos <= 1)
-              Text(
-                'Llegando',
-                style: AppTypography.textTheme.displayLarge?.copyWith(
-                  fontSize: 30,
-                  fontWeight: FontWeight.bold,
-                  color: etaColor,
                 ),
-              )
-            else
-              Text.rich(
-                TextSpan(
-                  text: '${eta.minutos}',
-                  style: AppTypography.textTheme.displayLarge?.copyWith(
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                    color: etaColor,
-                  ),
-                  children: [
+                const SizedBox(width: AppSpacing.md),
+                if (eta.minutos <= 1)
+                  Text(
+                    'Llegando',
+                    style: AppTypography.textTheme.displayLarge?.copyWith(
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                      color: etaColor,
+                    ),
+                  )
+                else
+                  Text.rich(
                     TextSpan(
-                      text: "'",
-                      style: TextStyle(
-                        fontSize: 20,
+                      text: '${eta.minutos}',
+                      style: AppTypography.textTheme.displayLarge?.copyWith(
+                        fontSize: 30,
                         fontWeight: FontWeight.bold,
                         color: etaColor,
                       ),
+                      children: [
+                        TextSpan(
+                          text: "'",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: etaColor,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-          ],
+                  ),
+              ],
+            ),
+          ),
         ),
-      ),
+        const Divider(
+          height: AppSpacing.sm,
+          thickness: 0.5,
+          color: AppColors.gray50,
+          indent: 16,
+        ),
+      ],
     );
   }
 
