@@ -28,8 +28,17 @@ build/
 !gtfs_san_antonio/*.txt  # Queremos ignorar GPX pero guardar el GTFS generado
 
 # Otros archivos
+.agents/
+.opencode/
+.cursor/
+.claude/
+.roo/
 **/data
 **/skills/**/scripts
 database/
 docs/
 **.docx**
+AGENTS.md
+SKILL.md
+HARNESS.md
+SPRINT.md
