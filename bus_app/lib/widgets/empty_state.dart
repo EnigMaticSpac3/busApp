@@ -22,14 +22,14 @@ class EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 48, color: AppColors.textSecondary),
+          Icon(icon, size: 48, color: AppColors.gray600),
           const SizedBox(height: AppSpacing.md),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
             child: Text(
               message,
               style: AppTypography.textTheme.bodyLarge?.copyWith(
-                color: AppColors.textSecondary,
+                color: AppColors.gray600,
               ),
               textAlign: TextAlign.center,
             ),
