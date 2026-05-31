@@ -100,7 +100,6 @@ class StopDetailSheet extends StatelessWidget {
   Widget _buildEtaCard(EtaCard eta) {
     final bgColor = _etaBgColor(eta.minutos);
     final etaColor = _etaTextColor(eta.minutos);
-    final etaLabel = _etaLabel(eta);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -140,14 +139,36 @@ class StopDetailSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.md),
-            Text(
-              etaLabel,
-              style: AppTypography.textTheme.displayLarge?.copyWith(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: etaColor,
+            if (eta.minutos <= 1)
+              Text(
+                'Llegando',
+                style: AppTypography.textTheme.displayLarge?.copyWith(
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                  color: etaColor,
+                ),
+              )
+            else
+              Text.rich(
+                TextSpan(
+                  text: '${eta.minutos}',
+                  style: AppTypography.textTheme.displayLarge?.copyWith(
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                    color: etaColor,
+                  ),
+                  children: [
+                    TextSpan(
+                      text: "'",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: etaColor,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -163,11 +184,7 @@ class StopDetailSheet extends StatelessWidget {
   Color _etaTextColor(int minutos) {
     if (minutos <= 1) return AppColors.alert;
     if (minutos <= 5) return AppColors.orange600;
-    return AppColors.primary;
+    return AppColors.accent;
   }
 
-  String _etaLabel(EtaCard eta) {
-    if (eta.minutos <= 1) return 'Llegando';
-    return '${eta.minutos}\'';
-  }
 }

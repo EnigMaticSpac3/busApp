@@ -80,14 +80,36 @@ class CollapsedEtaCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
-            Text(
-              _etaLabel,
-              style: AppTypography.textTheme.displayLarge?.copyWith(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-                color: _bgColor,
+            if (_minutos <= 1)
+              Text(
+                'Ahora',
+                style: AppTypography.textTheme.displayLarge?.copyWith(
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                  color: _bgColor,
+                ),
+              )
+            else
+              Text.rich(
+                TextSpan(
+                  text: '$_minutos',
+                  style: AppTypography.textTheme.displayLarge?.copyWith(
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                    color: _bgColor,
+                  ),
+                  children: [
+                    TextSpan(
+                      text: "'",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: _bgColor,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -120,8 +142,4 @@ class CollapsedEtaCard extends StatelessWidget {
     return AppColors.accent;
   }
 
-  String get _etaLabel {
-    if (_minutos <= 1) return 'Ahora';
-    return '$_minutos\'';
-  }
 }
