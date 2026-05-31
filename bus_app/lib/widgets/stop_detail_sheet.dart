@@ -109,6 +109,7 @@ class StopDetailSheet extends StatelessWidget {
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(AppRadius.medium),
+          boxShadow: [AppShadows.shadowSm],
         ),
         child: Row(
           children: [
