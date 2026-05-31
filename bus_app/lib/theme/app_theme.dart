@@ -62,6 +62,7 @@ class AppTheme {
 
       bottomSheetTheme: const BottomSheetThemeData(
         showDragHandle: false,
+        elevation: 4,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.large)),
         ),
