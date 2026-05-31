@@ -351,9 +351,21 @@ class _MapScreenState extends State<MapScreen> {
             bottom: 80,
             left: AppSpacing.lg,
             right: AppSpacing.lg,
-            child: EmptyState(
-              icon: Icons.directions_bus_outlined,
-              message: 'No hay buses activos en este momento.\nSé el primero en contribuir.',
+            child: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(AppRadius.medium),
+              color: AppColors.white,
+              surfaceTintColor: AppColors.white,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
+                  vertical: AppSpacing.xl,
+                ),
+                child: EmptyState(
+                  icon: Icons.directions_bus_outlined,
+                  message: 'No hay buses activos en este momento.\nSé el primero en contribuir.',
+                ),
+              ),
             ),
           ),
       ],
