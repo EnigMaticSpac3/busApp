@@ -35,13 +35,13 @@ class CrowdsourcingSheet extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(AppSpacing.xl),
           decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
+            color: AppColors.accent.withValues(alpha: 0.15),
             shape: BoxShape.circle,
           ),
           child: const Icon(
             Icons.directions_bus,
             size: 48,
-            color: AppColors.primary,
+            color: AppColors.accent,
           ),
         ),
         const SizedBox(height: AppSpacing.xxl),
@@ -61,9 +61,10 @@ class CrowdsourcingSheet extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: AppColors.lime50,
+            color: AppColors.white,
             borderRadius: BorderRadius.circular(AppRadius.small),
-            border: Border.all(color: AppColors.lime300.withValues(alpha: 0.6)),
+            border: Border.all(color: AppColors.lime300.withValues(alpha: 0.4)),
+            boxShadow: [AppShadows.shadowSm],
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -98,7 +99,7 @@ class CrowdsourcingSheet extends StatelessWidget {
             child: Text(
               'Ahora no',
               style: TextStyle(
-                color: AppColors.alert,
+                color: AppColors.primary,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
