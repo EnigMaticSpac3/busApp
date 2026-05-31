@@ -28,6 +28,12 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.primary,
         indicatorColor: AppColors.white.withValues(alpha: 0.3),
+        iconTheme: WidgetStateProperty.resolveWith((Set<WidgetState> states) {
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: AppColors.white);
+          }
+          return IconThemeData(color: AppColors.white.withValues(alpha: 0.5));
+        }),
         labelTextStyle: WidgetStatePropertyAll(
           AppTypography.textTheme.labelMedium?.copyWith(color: AppColors.white),
         ),
