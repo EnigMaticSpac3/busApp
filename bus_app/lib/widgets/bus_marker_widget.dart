@@ -87,7 +87,7 @@ class _AnimatedBusMarkerState extends State<AnimatedBusMarker>
             children: [
               if (widget.bus.esIncierto || widget.bus.esPerdido)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xs),
                   decoration: BoxDecoration(
                     color: AppColors.gray900,
                     borderRadius: BorderRadius.circular(4),
@@ -101,11 +101,11 @@ class _AnimatedBusMarkerState extends State<AnimatedBusMarker>
                 Container(
                   width: 48,
                   height: 48,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Color.fromRGBO(200, 213, 39, 0.4),
+                        color: AppColors.accent.withValues(alpha: 0.4),
                         blurRadius: 12,
                         spreadRadius: 2,
                       ),

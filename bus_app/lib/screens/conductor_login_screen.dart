@@ -263,7 +263,7 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
           foregroundColor: isValid
               ? AppColors.primary
               : AppColors.white.withValues(alpha: 0.5),
-          padding: const EdgeInsets.symmetric(vertical: 18),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.small),
           ),

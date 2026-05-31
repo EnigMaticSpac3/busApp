@@ -423,9 +423,7 @@ class _ConductorScreenState extends State<ConductorScreen> {
             const SizedBox(width: AppSpacing.md),
             Text(
               _deadManTexto,
-          style: TextStyle(
-              color: AppColors.alert, fontSize: 14,
-            ),
+              style: const TextStyle(fontSize: 14),
             ),
           ],
         ),
@@ -445,7 +443,7 @@ class _ConductorScreenState extends State<ConductorScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: _isTracking ? AppColors.alert : AppColors.accent,
           foregroundColor: _isTracking ? AppColors.white : AppColors.primary,
-          padding: const EdgeInsets.symmetric(vertical: 18),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.small),
           ),

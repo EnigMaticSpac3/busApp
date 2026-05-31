@@ -168,8 +168,8 @@ class _RutaDetalleScreenState extends State<RutaDetalleScreen> {
                       shape: BoxShape.circle,
                       boxShadow: [
                         if (bus.esActivo)
-                          const BoxShadow(
-                            color: Color.fromRGBO(200, 213, 39, 0.4),
+                          BoxShadow(
+                            color: AppColors.accent.withValues(alpha: 0.4),
                             blurRadius: 10,
                             spreadRadius: 2,
                           ),

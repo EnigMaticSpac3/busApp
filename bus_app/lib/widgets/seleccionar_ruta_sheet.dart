@@ -52,15 +52,15 @@ class _SeleccionarRutaSheetState extends State<SeleccionarRutaSheet> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text(
+        Text(
           'Selecciona tu ruta',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          style: AppTypography.textTheme.titleLarge,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
           'Elige la ruta del bus en la que vas a viajar',
-          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+          style: AppTypography.textTheme.bodyMedium,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: AppSpacing.lg),

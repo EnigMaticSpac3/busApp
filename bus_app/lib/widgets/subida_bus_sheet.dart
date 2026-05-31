@@ -116,16 +116,13 @@ class _SubidaBusSheetState extends State<SubidaBusSheet> {
           widget.busId != null
               ? '¿Subiste al bus ${widget.busId}?'
               : '¿Subiste al bus?',
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          style: AppTypography.textTheme.titleLarge,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: AppSpacing.md),
         Text(
           'Confirma para comenzar a compartir tu ubicación como pasajero.',
-          style: TextStyle(
-            fontSize: 14,
-            color: AppColors.textSecondary,
-          ),
+          style: AppTypography.textTheme.bodyMedium,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: AppSpacing.xxl),
