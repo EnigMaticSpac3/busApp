@@ -26,17 +26,20 @@ class AppTheme {
       ),
 
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.primary,
-        indicatorColor: AppColors.white.withValues(alpha: 0.3),
+        backgroundColor: AppColors.white,
+        indicatorColor: AppColors.primary.withValues(alpha: 0.12),
         iconTheme: WidgetStateProperty.resolveWith((Set<WidgetState> states) {
           if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: AppColors.white);
+            return const IconThemeData(color: AppColors.primary);
           }
-          return IconThemeData(color: AppColors.white.withValues(alpha: 0.5));
+          return const IconThemeData(color: AppColors.gray300);
         }),
-        labelTextStyle: WidgetStatePropertyAll(
-          AppTypography.textTheme.labelMedium?.copyWith(color: AppColors.white),
-        ),
+        labelTextStyle: WidgetStateProperty.resolveWith((Set<WidgetState> states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppTypography.textTheme.labelMedium?.copyWith(color: AppColors.primary);
+          }
+          return AppTypography.textTheme.labelMedium?.copyWith(color: AppColors.gray300);
+        }),
       ),
 
       cardTheme: CardThemeData(
