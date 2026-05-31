@@ -268,50 +268,61 @@ class _RutaDetalleScreenState extends State<RutaDetalleScreen> {
   }
 
   Widget _buildParadaItem(ParadaModel parada) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: InkWell(
-        onTap: () => _centrarEnParada(parada.lat, parada.lon),
-        borderRadius: BorderRadius.circular(AppRadius.medium),
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          decoration: BoxDecoration(
-            color: AppColors.white,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 0),
+          child: InkWell(
+            onTap: () => _centrarEnParada(parada.lat, parada.lon),
             borderRadius: BorderRadius.circular(AppRadius.medium),
-            boxShadow: [AppShadows.shadowSm],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    '${parada.orden}',
-                    style: AppTypography.textTheme.labelLarge?.copyWith(
-                      color: AppColors.primary,
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(AppRadius.medium),
+                boxShadow: [AppShadows.shadowSm],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${parada.orden}',
+                        style: AppTypography.textTheme.labelLarge?.copyWith(
+                          color: AppColors.primary,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      parada.nombre,
+                      style: AppTypography.textTheme.bodyLarge,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, color: AppColors.textSecondary, size: 20),
+                ],
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  parada.nombre,
-                  style: AppTypography.textTheme.bodyLarge,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Icon(Icons.chevron_right, color: AppColors.textSecondary, size: 20),
-            ],
+            ),
           ),
         ),
-      ),
+        const Divider(
+          height: AppSpacing.sm,
+          thickness: 0.5,
+          color: AppColors.gray50,
+          indent: 52,
+        ),
+      ],
     );
   }
 }
