@@ -315,18 +315,17 @@ class _StopMarker extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: AppColors.primary,
         shape: BoxShape.circle,
-        border: Border.all(color: AppColors.primary, width: 2),
         boxShadow: [AppShadows.shadowSm],
       ),
       child: Center(
         child: Text(
           '$orden',
-          style: TextStyle(
-            fontSize: 10,
+          style: const TextStyle(
+            fontSize: 11,
             fontWeight: FontWeight.bold,
-            color: AppColors.primary,
+            color: AppColors.white,
           ),
         ),
       ),
