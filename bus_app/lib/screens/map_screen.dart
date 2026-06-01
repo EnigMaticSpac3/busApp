@@ -202,7 +202,7 @@ class _MapScreenState extends State<MapScreen> {
 
   void _centrarEnUsuario() {
     if (_posicionUsuario != null) {
-      _mapController.move(_posicionUsuario!, _mapController.camera.zoom);
+      _mapController.move(_posicionUsuario!, 16.0);
       setState(() => _mapaCentradoPorUsuario = true);
     }
   }
