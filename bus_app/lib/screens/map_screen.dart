@@ -339,9 +339,9 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ],
         ),
-        // SearchBar overlay
+        // SearchBar overlay — respeta área de notch/isla
         Positioned(
-          top: AppSpacing.md,
+          top: AppSpacing.md + MediaQuery.of(context).padding.top,
           left: AppSpacing.lg,
           right: AppSpacing.lg,
           child: AppSearchBar(),
