@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bus_app/theme/export.dart';
 import '../services/api_service.dart';
 
@@ -201,9 +202,26 @@ class _ConductorScreenState extends State<ConductorScreen> {
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Cerrar sesión de conductor',
-            onPressed: () {
+            onPressed: () async {
               _stopTracking();
-              Navigator.of(context).pushReplacementNamed('/');
+
+              // Capturamos el navigator antes de los async gaps
+              final navigator = Navigator.of(context);
+
+              // 1. Notificar al backend que la sesión terminó (opcional, con try/catch)
+              await _api.endConductorSession(widget.conductorToken);
+
+              // 2. Limpiar SharedPreferences de sesión (no de configuración general)
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove('session_id');
+              await prefs.remove('ruta_id');
+              await prefs.remove('crowdsourcing_decidido');
+
+              // 3. Navegar a raíz limpiando toda la pila de navegación
+              navigator.pushNamedAndRemoveUntil(
+                '/',
+                (route) => false,
+              );
             },
           ),
         ],

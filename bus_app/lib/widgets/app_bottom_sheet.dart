@@ -10,8 +10,8 @@ class AppBottomSheet extends StatelessWidget {
     return showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
-      isDismissible: false,
-      enableDrag: false,
+      isDismissible: true,
+      enableDrag: true,
       elevation: 4,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.large)),
