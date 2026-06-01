@@ -185,4 +185,25 @@ class ApiService {
       return false;
     }
   }
+
+  /// Notifica al backend que la sesión de conductor terminó.
+  /// Usa try/catch por si el endpoint no existe aún en el backend.
+  Future<void> endConductorSession(String token) async {
+    try {
+      await http
+          .post(
+            Uri.parse('$_base/api/sesion-conductor/fin'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: json.encode({
+              'conductor_token': token,
+            }),
+          )
+          .timeout(_timeout);
+    } catch (e) {
+      debugPrint('endConductorSession (no crítico): $e');
+    }
+  }
 }
