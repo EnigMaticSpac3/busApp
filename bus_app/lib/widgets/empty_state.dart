@@ -7,6 +7,7 @@ class EmptyState extends StatelessWidget {
   final String message;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final VoidCallback? onDismiss;
 
   const EmptyState({
     super.key,
@@ -14,11 +15,12 @@ class EmptyState extends StatelessWidget {
     required this.message,
     this.actionLabel,
     this.onAction,
+    this.onDismiss,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    final content = Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -48,5 +50,24 @@ class EmptyState extends StatelessWidget {
         ],
       ),
     );
+
+    if (onDismiss != null) {
+      return Stack(
+        children: [
+          content,
+          Positioned(
+            top: -AppSpacing.sm,
+            right: -AppSpacing.sm,
+            child: IconButton(
+              icon: Icon(Icons.close, color: AppColors.gray300),
+              onPressed: onDismiss,
+              tooltip: 'Descartar',
+            ),
+          ),
+        ],
+      );
+    }
+
+    return content;
   }
 }

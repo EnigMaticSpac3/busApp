@@ -60,6 +60,7 @@ class _MapScreenState extends State<MapScreen> {
 
   Timer? _pollingTimer;
   StreamSubscription<Position>? _locationSubscription;
+  bool _emptyBannerDismissed = false;
 
   @override
   void initState() {
@@ -72,11 +73,21 @@ class _MapScreenState extends State<MapScreen> {
     _iniciarPolling();
     _iniciarUbicacion();
     _mostrarSheetSiCorresponde();
+    _loadEmptyBannerPreference();
 
     if (widget.coordenadasIniciales != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _mapController.move(widget.coordenadasIniciales!, widget.zoomInicial);
         widget.onMapaCentrado?.call();
+      });
+    }
+  }
+
+  Future<void> _loadEmptyBannerPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _emptyBannerDismissed = prefs.getBool('empty_banner_dismissed') ?? false;
       });
     }
   }
@@ -346,7 +357,7 @@ class _MapScreenState extends State<MapScreen> {
           right: AppSpacing.lg,
           child: AppSearchBar(),
         ),
-        if (_flota.isEmpty && !_cargandoRuta)
+        if (_flota.isEmpty && !_cargandoRuta && !_emptyBannerDismissed)
           Positioned(
             bottom: 80,
             left: AppSpacing.lg,
@@ -364,6 +375,13 @@ class _MapScreenState extends State<MapScreen> {
                 child: EmptyState(
                   icon: Icons.directions_bus_outlined,
                   message: 'No hay buses activos en este momento.\nSé el primero en contribuir.',
+                  onDismiss: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setBool('empty_banner_dismissed', true);
+                    if (mounted) {
+                      setState(() => _emptyBannerDismissed = true);
+                    }
+                  },
                 ),
               ),
             ),
