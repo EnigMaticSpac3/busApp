@@ -676,6 +676,11 @@ class SesionConductor(BaseModel):
     ruta_id: str
 
 
+class FinSesionConductor(BaseModel):
+    """Payload para finalizar sesión de conductor."""
+    conductor_token: str
+
+
 @app.post("/api/sesion-conductor")
 async def iniciar_sesion_conductor(payload: SesionConductor):
     """
@@ -711,6 +716,37 @@ async def iniciar_sesion_conductor(payload: SesionConductor):
             "estado": "activa",
             "inicio": time.time(),
         }
+
+
+@app.post("/api/sesion-conductor/fin")
+async def finalizar_sesion_conductor(payload: FinSesionConductor):
+    """
+    Finaliza una sesión de conductor.
+    Elimina la sesión de sesiones_conductor y emite broadcast WebSocket.
+    Es idempotente: si el token no existe, responde 200 OK igual.
+    """
+    try:
+        async with _sesiones_conductor_lock:
+            if payload.conductor_token in sesiones_conductor:
+                del sesiones_conductor[payload.conductor_token]
+                log.info(
+                    f"Sesión de conductor {payload.conductor_token[:8]}... finalizada"
+                )
+
+                # Broadcast a todos los clientes WebSocket
+                flota_actual = _get_flota_data_completa()
+                await manager.broadcast({"tipo": "flota", "datos": flota_actual})
+            else:
+                log.info(
+                    f"Intento de finalizar sesión de conductor inexistente: "
+                    f"{payload.conductor_token[:8]}... (idempotente)"
+                )
+
+        return {"estado": "ok", "mensaje": "sesión finalizada"}
+    except Exception as e:
+        log.error(f"Error al finalizar sesión de conductor: {e}")
+        # Idempotente: siempre devolvemos OK
+        return {"estado": "ok", "mensaje": "sesión finalizada"}
 
 
 @app.post("/api/gps-conductor")
