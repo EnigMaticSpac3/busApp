@@ -15,7 +15,7 @@ Sistema de monitoreo en tiempo real para la ruta interna de San Antonio, San Mig
 | **v2** | ✅ Estable | Sesiones dinámicas, crowdsourcing real |
 | **v3** | ✅ Completado | Menú de rutas, ubicación usuario, NavigationBar |
 | **v4** | ✅ Completado | WebSocket, animaciones de marcadores |
-| **v5A** | ✅ Completado | Modo conductor con autenticación PIN |
+| **v5A** | 🔄 ~85% | Modo conductor funcional (PIN, GPS, Dead Man's Switch 300s). Pendiente: background service, optimización batería, deploy. |
 | **v5B** | ⬜ Pendiente | Notificaciones push (FCM) |
 | **v5C** | ⬜ Pendiente | Planificador de rutas (OpenTripPlanner) |
 | **v5D** | ⬜ Pendiente | Deployment Fly.io |

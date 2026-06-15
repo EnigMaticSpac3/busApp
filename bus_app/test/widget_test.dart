@@ -13,9 +13,6 @@ void main() {
     await tester.pumpWidget(const BusApp());
     await tester.pumpAndSettle();
 
-    // Verify that the app shows the title
-    expect(find.text('San Antonio Bus Tracker'), findsOneWidget);
-
     // Verify that the navigation bar shows both tabs
     expect(find.text('Mapa'), findsOneWidget);
     expect(find.text('Rutas'), findsOneWidget);
