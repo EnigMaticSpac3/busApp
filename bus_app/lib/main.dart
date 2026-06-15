@@ -1,12 +1,17 @@
 // lib/main.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'theme/export.dart';
 import 'screens/home_screen.dart';
 import 'screens/conductor_login_screen.dart';
 import 'screens/conductor_screen.dart';
 
-void main() {
+void main() async {
+  // Cargar variables desde .env (BACKEND_URL, etc.)
+  // El archivo .env está en bus_app/.env y listado en assets de pubspec.yaml.
+  // Si no existe, se usa el fallback en AppConfig.backendUrl.
+  await dotenv.load(fileName: '.env');
   runApp(const BusApp());
 }
 
