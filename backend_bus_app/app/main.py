@@ -123,6 +123,9 @@ ruta_puntos: list = []
 # Paradas: lista de dicts con stop_id, nombre, lat, lon, indice_ruta, dist_ruta
 paradas_info: list = []
 
+# Caché de paradas por ruta_id (para el endpoint /api/rutas/{ruta_id}/paradas)
+_paradas_cache: dict[str, list] = {}
+
 # Sesiones activas por ruta (clave: ruta_id)
 sesiones_activas: dict[str, dict] = {}
 _sesiones_lock = asyncio.Lock()
@@ -245,6 +248,119 @@ def cargar_paradas_desde_gtfs(ruta: list) -> list:
     return paradas
 
 
+def _obtener_paradas_por_ruta(ruta_id: str) -> list:
+    """
+    Obtiene las paradas para una ruta específica desde GTFS.
+    Usa caché para evitar leer archivos repetidamente.
+
+    En GTFS la relación es:
+      route_id (routes.txt) → trip_id (trips.txt) → stop_times.txt → stops.txt
+
+    Returns:
+        Lista de dicts con stop_id, nombre, lat, lon, indice_ruta, dist_ruta, llegada_seg.
+        Si la ruta no existe o no tiene paradas, devuelve lista vacía.
+    """
+    if ruta_id in _paradas_cache:
+        return _paradas_cache[ruta_id]
+
+    try:
+        # Paso 1: Buscar trip_ids para esta ruta en trips.txt
+        trips = leer_csv_gtfs("trips.txt")
+        trips_ruta = [t for t in trips if t.get("route_id", "") == ruta_id]
+
+        if not trips_ruta:
+            log.info(f"Ruta '{ruta_id}' no encontrada en trips.txt — sin paradas")
+            _paradas_cache[ruta_id] = []
+            return []
+
+        # Usar el primer trip (asumiendo viaje de ida)
+        trip_id = trips_ruta[0]["trip_id"]
+        shape_id = trips_ruta[0].get("shape_id", "")
+
+        # Paso 2: Cargar el shape para este trip (necesitamos los puntos
+        #          para calcular indice_ruta por shape_dist_traveled)
+        shapes = leer_csv_gtfs("shapes.txt")
+        shape_puntos = [
+            {
+                "lat":       float(row["shape_pt_lat"]),
+                "lon":       float(row["shape_pt_lon"]),
+                "secuencia": int(row["shape_pt_sequence"]),
+                "dist":      float(row["shape_dist_traveled"]),
+            }
+            for row in shapes
+            if row["shape_id"] == shape_id
+        ]
+        shape_puntos.sort(key=lambda p: p["secuencia"])
+
+        if not shape_puntos:
+            log.warning(f"No se encontró shape '{shape_id}' para trip '{trip_id}'")
+            _paradas_cache[ruta_id] = []
+            return []
+
+        # Paso 3: Cargar diccionario de stops
+        stops_raw = leer_csv_gtfs("stops.txt")
+        stops_dict = {
+            row["stop_id"]: {
+                "nombre": row["stop_name"],
+                "lat":    float(row["stop_lat"]),
+                "lon":    float(row["stop_lon"]),
+            }
+            for row in stops_raw
+        }
+
+        # Paso 4: Cargar stop_times para este trip
+        stop_times = leer_csv_gtfs("stop_times.txt")
+        paradas_del_trip = sorted(
+            [row for row in stop_times if row["trip_id"] == trip_id],
+            key=lambda r: int(r["stop_sequence"])
+        )
+
+        if not paradas_del_trip:
+            log.warning(f"No se encontraron stop_times para trip '{trip_id}'")
+            _paradas_cache[ruta_id] = []
+            return []
+
+        # Paso 5: Construir lista de paradas
+        paradas = []
+        for row in paradas_del_trip:
+            stop_id = row["stop_id"]
+            if stop_id not in stops_dict:
+                log.warning(f"stop_id '{stop_id}' en stop_times no existe en stops.txt, omitido.")
+                continue
+
+            stop = stops_dict[stop_id]
+            dist_gtfs = float(row.get("shape_dist_traveled", 0))
+
+            # Buscar el índice más cercano por distancia acumulada
+            indice_cercano = min(
+                range(len(shape_puntos)),
+                key=lambda i: abs(shape_puntos[i]["dist"] - dist_gtfs)
+            )
+
+            paradas.append({
+                "stop_id":     stop_id,
+                "nombre":      stop["nombre"],
+                "lat":         stop["lat"],
+                "lon":         stop["lon"],
+                "indice_ruta": indice_cercano,
+                "dist_ruta":   dist_gtfs,
+                "llegada_seg": gtfs_time_a_segundos(row["arrival_time"]),
+            })
+
+        log.info(f"Paradas cargadas para ruta '{ruta_id}': {len(paradas)} paradas (trip={trip_id})")
+        _paradas_cache[ruta_id] = paradas
+        return paradas
+
+    except FileNotFoundError as e:
+        log.error(f"Archivo GTFS no encontrado al cargar paradas para ruta '{ruta_id}': {e}")
+        _paradas_cache[ruta_id] = []
+        return []
+    except Exception as e:
+        log.error(f"Error inesperado al cargar paradas para ruta '{ruta_id}': {e}")
+        _paradas_cache[ruta_id] = []
+        return []
+
+
 # ---------------------------------------------------------------------------
 # Monitor de sesiones
 # ---------------------------------------------------------------------------
@@ -335,6 +451,17 @@ async def lifespan(app: FastAPI):
         if not paradas_info:
             raise ValueError("No se encontraron paradas para el trip_id configurado")
 
+        # Precargar paradas para todas las rutas disponibles
+        try:
+            rutas = leer_csv_gtfs("routes.txt")
+            for ruta in rutas:
+                r_id = ruta.get("route_id", "")
+                if r_id:
+                    _obtener_paradas_por_ruta(r_id)
+            log.info(f"Paradas precargadas para {len(rutas)} ruta(s) en caché")
+        except Exception as e:
+            log.warning(f"No se pudieron precargar todas las rutas: {e}")
+
     except Exception as e:
         log.error(f"Error al cargar datos GTFS: {e}")
         raise
@@ -413,10 +540,14 @@ async def get_paradas_ruta(ruta_id: str):
     """
     Devuelve las paradas de una ruta en orden, con su posición
     en la secuencia del recorrido.
+
+    Usa el ruta_id recibido en la URL para buscar las paradas
+    correspondientes en el GTFS. La relación es:
+      route_id → trip_id (trips.txt) → stop_times → stops
     """
-    # Filtrar paradas por ruta_id si hay múltiples rutas
-    # Por ahora usamos paradas_info que corresponde a la ruta actual
-    paradas_ordenadas = sorted(paradas_info, key=lambda p: p.get("indice_ruta", 0))
+    # Cargar paradas dinámicamente según el ruta_id
+    paradas = _obtener_paradas_por_ruta(ruta_id)
+    paradas_ordenadas = sorted(paradas, key=lambda p: p.get("indice_ruta", 0))
 
     return {
         "ruta_id": ruta_id,
