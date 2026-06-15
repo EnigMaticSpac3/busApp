@@ -1,16 +1,22 @@
 // lib/config/app_config.dart
 //
 // Centraliza la URL del backend y otras constantes.
-// Para cambiar entre desarrollo y producción, solo tocas este archivo.
+// BACKEND_URL se lee desde el archivo .env (ver .env.example).
+// Si no está disponible, se usa un valor por defecto como fallback.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AppConfig {
-  // En Chrome (web) localhost funciona porque el navegador corre en la misma máquina.
-  // Cuando migremos a dispositivo físico Android/iOS, cambia esto por la IP
-  // local de tu máquina (ej: 'http://192.168.1.X:8000').
-  // static const String backendUrl = 'http://192.168.0.5:8000';
-  static const String backendUrl = 'https://library-doodle-keenly.ngrok-free.dev';
+  /// URL del backend. Se lee desde la variable BACKEND_URL en .env.
+  /// Si el archivo .env no está cargado o la variable no existe,
+  /// se usa el valor por defecto.
+  static String get backendUrl {
+    if (dotenv.isInitialized && dotenv.env.containsKey('BACKEND_URL')) {
+      return dotenv.env['BACKEND_URL']!;
+    }
+    return 'https://library-doodle-keenly.ngrok-free.dev';
+  }
 
   // Intervalo de polling a la flota en segundos
   static const int flotaPollingSegundos = 2;

@@ -8,7 +8,6 @@ class EmptyState extends StatelessWidget {
   final String? actionLabel;
   final VoidCallback? onAction;
   final VoidCallback? onDismiss;
-  final VoidCallback? onDismiss;
 
   const EmptyState({
     super.key,
@@ -16,7 +15,6 @@ class EmptyState extends StatelessWidget {
     required this.message,
     this.actionLabel,
     this.onAction,
-    this.onDismiss,
     this.onDismiss,
   });
 
