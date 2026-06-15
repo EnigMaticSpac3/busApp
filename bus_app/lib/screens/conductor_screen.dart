@@ -154,7 +154,17 @@ class _ConductorScreenState extends State<ConductorScreen> {
           position.speed,
         );
       } catch (e) {
-        setState(() => _error = 'Error enviando posición');
+        // Si falla el GPS, re-enviar la última posición conocida
+        // Esto evita que el bus desaparezca del mapa por pérdida temporal de señal
+        if (_currentPosition != null && mounted) {
+          await _api.sendConductorPosition(
+            widget.conductorToken,
+            _currentPosition!.latitude,
+            _currentPosition!.longitude,
+            _currentPosition!.speed,
+          );
+        }
+        setState(() => _error = 'GPS temporalmente no disponible');
       }
     });
   }
