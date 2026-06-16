@@ -202,40 +202,49 @@ class _ConductorScreenState extends State<ConductorScreen> {
     });
   }
 
+  Future<void> _cerrarSesion() async {
+    _stopTracking();
+
+    // Capturamos el navigator antes de los async gaps
+    final navigator = Navigator.of(context);
+
+    // 1. Notificar al backend que la sesión terminó (opcional, con try/catch)
+    await _api.endConductorSession(widget.conductorToken);
+
+    // 2. Limpiar SharedPreferences de sesión (no de configuración general)
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('session_id');
+    await prefs.remove('ruta_id');
+    await prefs.remove('crowdsourcing_decidido');
+
+    // 3. Navegar a raíz limpiando toda la pila de navegación
+    navigator.pushNamedAndRemoveUntil(
+      '/',
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.primary,
-      appBar: AppBar(
-        title: Text(widget.nombreConductor),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Cerrar sesión de conductor',
-            onPressed: () async {
-              _stopTracking();
-
-              // Capturamos el navigator antes de los async gaps
-              final navigator = Navigator.of(context);
-
-              // 1. Notificar al backend que la sesión terminó (opcional, con try/catch)
-              await _api.endConductorSession(widget.conductorToken);
-
-              // 2. Limpiar SharedPreferences de sesión (no de configuración general)
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.remove('session_id');
-              await prefs.remove('ruta_id');
-              await prefs.remove('crowdsourcing_decidido');
-
-              // 3. Navegar a raíz limpiando toda la pila de navegación
-              navigator.pushNamedAndRemoveUntil(
-                '/',
-                (route) => false,
-              );
-            },
-          ),
-        ],
-      ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (!didPop) {
+          await _cerrarSesion();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.primary,
+        appBar: AppBar(
+          title: Text(widget.nombreConductor),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout),
+              tooltip: 'Cerrar sesión de conductor',
+              onPressed: _cerrarSesion,
+            ),
+          ],
+        ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.xl),
@@ -257,6 +266,7 @@ class _ConductorScreenState extends State<ConductorScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
