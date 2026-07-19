@@ -11,8 +11,19 @@ import 'package:latlong2/latlong.dart';
 import '../config/app_config.dart';
 import '../models/bus_sesion_model.dart';
 import '../models/eta_model.dart';
+import '../models/eta_parada_response.dart';
 import '../models/parada_model.dart';
 import '../models/ruta_model.dart';
+
+// ---------------------------------------------------------------------------
+// Respuesta de fetchRuta: incluye rutaId + puntos del shape
+// ---------------------------------------------------------------------------
+
+class RutaResponse {
+  final String rutaId;
+  final List<LatLng> puntos;
+  const RutaResponse({required this.rutaId, required this.puntos});
+}
 
 class ApiService {
   final String _base = AppConfig.backendUrl;
@@ -74,7 +85,7 @@ class ApiService {
 
   /// Descarga los puntos del shape de la ruta.
   /// Se llama una sola vez al iniciar la app.
-  Future<List<LatLng>> fetchRuta() async {
+  Future<RutaResponse?> fetchRuta() async {
     try {
       final response = await http
           .get(Uri.parse('$_base/api/ruta'))
@@ -82,18 +93,20 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
-        return (data['puntos'] as List)
+        final rutaId = data['ruta_id'] as String? ?? 'SA_R1';
+        final puntos = (data['puntos'] as List)
             .map((p) => LatLng(
                   (p['lat'] as num).toDouble(),
                   (p['lon'] as num).toDouble(),
                 ))
             .toList();
+        return RutaResponse(rutaId: rutaId, puntos: puntos);
       }
       debugPrint('fetchRuta: status ${response.statusCode}');
-      return [];
+      return null;
     } catch (e) {
       debugPrint('fetchRuta error: $e');
-      return [];
+      return null;
     }
   }
 
@@ -146,6 +159,26 @@ class ApiService {
       return null;
     } catch (e) {
       debugPrint('fetchEta error: $e');
+      return null;
+    }
+  }
+
+  /// Obtiene los buses que se acercan a una parada específica con sus ETAs.
+  Future<EtaParadaResponse?> fetchEtaParada(String paradaId) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$_base/api/eta-parada/$paradaId'))
+          .timeout(_timeout);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        if (data.containsKey('error')) return null;
+        return EtaParadaResponse.fromJson(data);
+      }
+      debugPrint('fetchEtaParada: status ${response.statusCode}');
+      return null;
+    } catch (e) {
+      debugPrint('fetchEtaParada error: $e');
       return null;
     }
   }

@@ -7,13 +7,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
 import '../models/bus_sesion_model.dart';
-import '../models/eta_model.dart';
+import '../models/parada_model.dart';
 import '../services/api_service.dart';
 import '../services/crowdsourcing_service.dart';
 import '../services/websocket_service.dart';
 import '../widgets/bus_marker_widget.dart';
 import '../widgets/crowdsourcing_sheet.dart';
-import '../widgets/collapsed_eta_card.dart';
+import '../widgets/stop_marker.dart';
+import '../widgets/stop_detail_sheet.dart';
 import '../widgets/seleccionar_ruta_sheet.dart';
 import '../widgets/subida_bus_sheet.dart';
 import '../widgets/app_search_bar.dart';
@@ -48,15 +49,15 @@ class _MapScreenState extends State<MapScreen> {
 
   List<LatLng> _routePoints = [];
   List<BusSesion> _flota = [];
-  EtaParada?   _eta;
-  String?      _currentSessionId;
   LatLng?      _posicionUsuario;
   bool         _mapaCentradoPorUsuario = true;
   Map<String, LatLng> _posicionesAnterioresBuses = {};
 
   bool    _cargandoRuta = true;
-  bool    _cargandoEta  = true;
   String? _errorRuta;
+
+  List<ParadaModel> _paradas = [];
+  double _currentZoom = 15.0;
 
   Timer? _pollingTimer;
   StreamSubscription<Position>? _locationSubscription;
@@ -173,7 +174,6 @@ class _MapScreenState extends State<MapScreen> {
           context,
           busId: null,
           onConfirmado: (sessionId) {
-            setState(() => _currentSessionId = sessionId);
             _crowdsourcing.setRutaPoints(_routePoints);
             _crowdsourcing.iniciar();
           },
@@ -193,14 +193,29 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _cargarRuta() async {
-    final puntos = await _api.fetchRuta();
+    final response = await _api.fetchRuta();
+    if (!mounted) return;
+    if (response == null) {
+      setState(() {
+        _cargandoRuta = false;
+        _errorRuta = 'No se pudo cargar la ruta';
+      });
+      return;
+    }
+    setState(() {
+      _cargandoRuta = false;
+      _routePoints = response.puntos;
+    });
+    _crowdsourcing.setRutaPoints(response.puntos);
+    await _cargarParadas(response.rutaId);
+  }
+
+  Future<void> _cargarParadas(String rutaId) async {
+    final paradas = await _api.fetchParadas(rutaId);
     if (!mounted) return;
     setState(() {
-      _cargandoRuta = puntos.isEmpty;
-      _errorRuta    = puntos.isEmpty ? 'No se pudo cargar la ruta' : null;
-      _routePoints  = puntos;
+      _paradas = paradas;
     });
-    _crowdsourcing.setRutaPoints(puntos);
   }
 
   void _iniciarPolling() {
@@ -218,6 +233,29 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  Future<void> _onStopTap(ParadaModel parada) async {
+    final response = await _api.fetchEtaParada(parada.paradaId);
+    if (!mounted) return;
+
+    StopDetailSheet.mostrar(
+      context,
+      paradaNombre: parada.nombre,
+      paradaId: parada.paradaId,
+      etas: response?.buses.map((b) => EtaCard(
+        rutaCodigo: b.rutaCodigo,
+        destino: b.rutaId,
+        eta: b.eta,
+        minutos: _parseMinutos(b.eta),
+      )).toList() ?? [],
+    );
+  }
+
+  int _parseMinutos(String eta) {
+    final match = RegExp(r'(\d+)\s*min').firstMatch(eta);
+    if (match != null) return int.parse(match.group(1)!);
+    return eta.contains('Menos de 1 min') ? 0 : 999;
+  }
+
   Future<void> _actualizarFlotaYEta() async {
     final posicionesActuales = <String, LatLng>{};
     for (final bus in _flota) {
@@ -226,20 +264,11 @@ class _MapScreenState extends State<MapScreen> {
       }
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final sessionId = _currentSessionId ?? prefs.getString('session_id');
-    final busId = sessionId ?? 'Bus';
-
-    final resultados = await Future.wait([
-      _api.fetchFlota(),
-      _api.fetchEta(busId),
-    ]);
+    final flota = await _api.fetchFlota();
     if (!mounted) return;
     setState(() {
       _posicionesAnterioresBuses = posicionesActuales;
-      _flota = resultados[0] as List<BusSesion>;
-      _eta         = resultados[1] as EtaParada?;
-      _cargandoEta = false;
+      _flota = flota;
     });
   }
 
@@ -254,16 +283,6 @@ class _MapScreenState extends State<MapScreen> {
               top: 0, left: 0, right: 0,
               child: ErrorBanner(message: 'Dejaste de contribuir (saliste de la ruta)'),
             ),
-          Positioned(
-            left: 0, right: 0,
-            bottom: 100,
-            child: CollapsedEtaCard(
-              eta: _eta,
-              cargando: _cargandoEta,
-              busId: _currentSessionId,
-              webSocketConectado: _wsService?.conectado,
-            ),
-          ),
         ],
       ),
       floatingActionButton: _buildFab(),
@@ -318,9 +337,18 @@ class _MapScreenState extends State<MapScreen> {
           options: MapOptions(
             initialCenter: const LatLng(9.0561, -79.4582),
             initialZoom: 15.0,
+            minZoom: 12.0,
+            maxZoom: 18.0,
             onPositionChanged: (position, hasGesture) {
               if (hasGesture) {
                 setState(() => _mapaCentradoPorUsuario = false);
+              }
+              final newZoom = position.zoom;
+              final zoomCambioSignificativo = (newZoom - _currentZoom).abs() >= 1;
+              final cruceUmbral = (_currentZoom < 15 && newZoom >= 15) ||
+                                  (_currentZoom >= 15 && newZoom < 15);
+              if (zoomCambioSignificativo || cruceUmbral) {
+                setState(() => _currentZoom = newZoom);
               }
             },
           ),
@@ -341,6 +369,20 @@ class _MapScreenState extends State<MapScreen> {
             MarkerLayer(
               markers: [
                 ...buildBusMarkers(_flota, _posicionesAnterioresBuses),
+                if (_currentZoom >= 15)
+                  ..._paradas.map((parada) => Marker(
+                    point: LatLng(parada.lat, parada.lon),
+                    width: _currentZoom >= 16 ? 24 : 18,
+                    height: _currentZoom >= 16 ? 24 : 18,
+                    child: GestureDetector(
+                      onTap: () => _onStopTap(parada),
+                      child: StopMarker(
+                        orden: parada.orden,
+                        size: _currentZoom >= 16 ? 24 : 18,
+                        showNumber: _currentZoom >= 16,
+                      ),
+                    ),
+                  )),
                 if (_posicionUsuario != null)
                   Marker(
                     point: _posicionUsuario!,
