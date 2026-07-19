@@ -1,5 +1,6 @@
 # Python
 venv/
+.venv/
 __pycache__/
 *.pyc
 .env
@@ -42,4 +43,5 @@ AGENTS.md
 SKILL.md
 HARNESS.md
 SPRINT.md
-LEGAL.md.venv/
+LEGAL.md
+backend_bus_app/.venv/
