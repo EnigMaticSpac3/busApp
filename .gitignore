@@ -1,5 +1,6 @@
 # Python
 venv/
+.venv/
 __pycache__/
 *.pyc
 .env
@@ -21,7 +22,6 @@ build/
 # IDEs
 .idea/
 .vscode/
-.claude/
 
 # Datos temporales o locales
 *.gpx
@@ -43,3 +43,4 @@ SKILL.md
 HARNESS.md
 SPRINT.md
 LEGAL.md
+skills-lock.json
