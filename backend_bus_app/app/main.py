@@ -137,6 +137,9 @@ _sesiones_conductor_lock = asyncio.Lock()
 # Último GPS recibido del conductor (clave: conductor_token)
 ultimo_gps_conductor: dict[str, dict] = {}
 
+# Mapeo de shape_id -> route_code (route_short_name) desde GTFS
+shape_to_route_code: dict[str, str] = {}
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -432,7 +435,7 @@ async def monitor_sesiones():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global ruta_puntos, paradas_info
+    global ruta_puntos, paradas_info, shape_to_route_code
 
     try:
         log.info(f"Cargando datos desde: {GTFS_DIR}")
@@ -461,6 +464,22 @@ async def lifespan(app: FastAPI):
             log.info(f"Paradas precargadas para {len(rutas)} ruta(s) en caché")
         except Exception as e:
             log.warning(f"No se pudieron precargar todas las rutas: {e}")
+
+        # Construir mapeo shape_id -> route_code desde GTFS
+        try:
+            trips_data = leer_csv_gtfs("trips.txt")
+            routes_data = leer_csv_gtfs("routes.txt")
+            route_id_to_code = {
+                r["route_id"]: r.get("route_short_name", r["route_id"])
+                for r in routes_data
+            }
+            for trip in trips_data:
+                sid = trip["shape_id"]
+                rid = trip["route_id"]
+                shape_to_route_code[sid] = route_id_to_code.get(rid, sid)
+            log.info(f"Rutas cargadas desde GTFS: {shape_to_route_code}")
+        except Exception as e:
+            log.warning(f"No se pudo cargar mapping de rutas: {e}")
 
     except Exception as e:
         log.error(f"Error al cargar datos GTFS: {e}")
@@ -494,7 +513,10 @@ app.add_middleware(
 
 @app.get("/api/ruta")
 async def get_ruta():
-    return {"puntos": [{"lat": p["lat"], "lon": p["lon"]} for p in ruta_puntos]}
+    return {
+        "ruta_id": SHAPE_ID,
+        "puntos": [{"lat": p["lat"], "lon": p["lon"]} for p in ruta_puntos],
+    }
 
 
 @app.get("/api/rutas")
@@ -723,6 +745,82 @@ async def get_parada_cercana(id_bus: str):
         }
 
     return {"parada": "Fin de recorrido", "eta": "--", "distancia": 0}
+
+
+@app.get("/api/eta-parada/{parada_id}")
+async def get_eta_parada(parada_id: str):
+    """
+    Dado un stop_id, devuelve todos los buses activos que se acercan
+    a esa parada con su ETA calculada.
+    """
+    # Buscar la parada en los datos cargados
+    parada = None
+    for p in paradas_info:
+        if p["stop_id"] == parada_id:
+            parada = p
+            break
+
+    if not parada:
+        return {"error": "Parada no encontrada"}
+
+    ahora = time.time()
+    buses = []
+
+    async with _sesiones_lock:
+        for ruta_id, sesion in sesiones_activas.items():
+            # Ignorar sesiones sin posición válida
+            if sesion["lat"] == 0.0 and sesion["lon"] == 0.0:
+                continue
+
+            # Ignorar sesiones expiradas (> 600s sin señal)
+            seg_sin_senal = ahora - sesion["ultimo_gps"]
+            if seg_sin_senal > 600:
+                continue
+
+            indice_sesion = sesion.get("indice_ruta", 0)
+            indice_parada = parada["indice_ruta"]
+
+            # Solo incluir si la parada está adelante del bus
+            if indice_sesion >= indice_parada:
+                continue
+
+            # Distancia entre el bus y la parada
+            distancia = haversine(
+                sesion["lat"], sesion["lon"],
+                parada["lat"], parada["lon"],
+            )
+
+            # Velocidad del bus (m/s), mínimo 1.11 m/s (~4 km/h)
+            velocidad = sesion.get("vel_ms", 0)
+            if velocidad <= 1.0:
+                velocidad = 1.11
+
+            # ETA en minutos
+            minutos = (distancia / velocidad) / 60
+            if minutos < 1:
+                eta = "Menos de 1 min"
+            else:
+                eta = f"{int(round(minutos))} min"
+
+            # Código de ruta (route_short_name) o fallback a ruta_id
+            ruta_codigo = shape_to_route_code.get(ruta_id, ruta_id)
+
+            buses.append({
+                "ruta_id":     ruta_id,
+                "ruta_codigo": ruta_codigo,
+                "bus_id":      f"Bus-{sesion['session_id']}",
+                "eta":         eta,
+                "distancia":   round(distancia, 0),
+            })
+
+    # Ordenar por distancia ascendente (más cercano primero)
+    buses.sort(key=lambda b: b["distancia"])
+
+    return {
+        "parada":    parada["nombre"],
+        "parada_id": parada_id,
+        "buses":     buses,
+    }
 
 
 class InicioSesion(BaseModel):
