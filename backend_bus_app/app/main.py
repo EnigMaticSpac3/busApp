@@ -1132,19 +1132,22 @@ async def contribuir_ubicacion(payload: UbicacionUsuario):
     if payload.precision_m is not None and payload.precision_m > 50:
         return {"estado": "rechazado", "motivo": "precisión GPS insuficiente"}
 
-    # Map matching: verificar que está en zona de ruta válida
-    map_result = map_matching(payload.lat, payload.lon, payload.velocidad_ms, payload.precision_m)
-    if map_result is None:
-        return {
-            "estado":  "ignorado",
-            "motivo":  "ubicación fuera de ruta o velocidad incompatible con bus",
-            "lat":     payload.lat,
-            "lon":     payload.lon,
-            "vel_ms":  payload.velocidad_ms,
-        }
-
     # Determinar si es conductor o pasajero
     es_conductor = payload.conductor_token is not None
+
+    # Map matching: solo para pasajeros (el conductor es el bus)
+    if not es_conductor:
+        map_result = map_matching(payload.lat, payload.lon, payload.velocidad_ms, payload.precision_m)
+        if map_result is None:
+            return {
+                "estado":  "ignorado",
+                "motivo":  "ubicación fuera de ruta o velocidad incompatible con bus",
+                "lat":     payload.lat,
+                "lon":     payload.lon,
+                "vel_ms":  payload.velocidad_ms,
+            }
+    else:
+        map_result = {"indice_ruta": 0}
 
     if es_conductor:
         # Modo conductor - buscar o crear sesión de conductor
