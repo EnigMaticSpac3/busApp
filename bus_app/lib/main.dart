@@ -21,7 +21,7 @@ class BusApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'San Antonio Bus Tracker',
+      title: 'Transita',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       initialRoute: '/',
