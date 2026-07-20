@@ -55,7 +55,7 @@ v5D ⬜  Deployment Fly.io — depende de v5A validado
 | T-12 | Preparar fly.toml para deployment futuro | @devops | 🟢 Baja | T-11 | Depende de T-11. |
 | T-28 | Nuevo endpoint `/api/eta-parada/{parada_id}` + mejorar `GET /api/ruta` con `ruta_id` | @backend | 🟡 Alta | ninguna | ✅ Resuelto. `GET /api/ruta` devuelve `ruta_id`. Nuevo endpoint `GET /api/eta-parada/{parada_id}` devuelve buses con ETA. Rama: `feat/backend-20260719-endpoint-eta-parada`. |
 | T-29 | ETA real al tocar parada en mapa (B+C): marcadores zoom-dependent + eliminar ETA flotante | @frontend | 🟡 Alta | T-28 | ✅ Resuelto. Paradas visibles en zoom≥15, tap abre sheet con ETAs. CollapsedEtaCard eliminado. Rama: feat/frontend-20260719-eta-parada-en-mapa. |
-| T-31 | Rebranding completo a "Transita" con paleta Canal (azul #004F7C, naranja #F59D3D, rojo #E84C2B). Plus Jakarta Sans + JetBrains Mono. Nuevos spacing/radius/shadows. | @frontend | 🟡 Alta | ninguna | Reemplazo completo de theme/. Nueva identidad visual basada en brand book Canal v1.0. |
+| T-31 | Rebranding completo a "Transita" con paleta Canal (azul #004F7C, naranja #F59D3D, rojo #E84C2B). Plus Jakarta Sans + JetBrains Mono. Nuevos spacing/radius/shadows. | @frontend | 🟡 Alta | ninguna | ✅ Resuelto. Nueva paleta Canal (azul #004F7C, naranja #F59D3D, rojo #E84C2B). Plus Jakarta Sans + JetBrains Mono. App rebautizada a "Transita". Rama: feat/frontend-20260719-rebranding-transita-canal. |
 
 ### Fase 2 — Aplazado / Resuelto (v5A original)
 
@@ -117,6 +117,7 @@ v5D ⬜  Deployment Fly.io — depende de v5A validado
 | 2026-07 | T-28 completado: endpoint eta-parada + ruta_id en GET /api/ruta | Orquestador |
 | 2026-07 | T-29 completado: ETA real al tocar parada en mapa + eliminado CollapsedEtaCard | Orquestador |
 | 2026-07 | T-31 creado: rebranding a Transita con paleta Canal | Orquestador |
+| 2026-07 | T-31 completado: rebranding a Transita con paleta Canal | Orquestador |
 
 ---
 
