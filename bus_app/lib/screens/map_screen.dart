@@ -15,7 +15,6 @@ import '../services/crowdsourcing_service.dart';
 import '../services/websocket_service.dart';
 import '../widgets/bus_sesion_adapter.dart';
 import '../widgets/map_overlays.dart';
-import '../widgets/search_pill.dart';
 import '../widgets/contribuir_fab.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_banner.dart';
@@ -84,9 +83,8 @@ class _MapScreenState extends State<MapScreen> {
       BusSesionAdapter.fromFlota(_flota, _rutaIdToCodigo);
 
   /// Convert real stop data into (name, LatLng) tuples for TransitMapOverlays.
-  List<(String, LatLng)> get _stopTuples => _paradas
-      .map((p) => (p.nombre, LatLng(p.lat, p.lon)))
-      .toList();
+  List<(String, LatLng)> get _stopTuples =>
+      _paradas.map((p) => (p.nombre, LatLng(p.lat, p.lon))).toList();
 
   @override
   void initState() {
@@ -124,7 +122,8 @@ class _MapScreenState extends State<MapScreen> {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
-        _emptyBannerDismissed = prefs.getBool('empty_banner_dismissed') ?? false;
+        _emptyBannerDismissed =
+            prefs.getBool('empty_banner_dismissed') ?? false;
       });
     }
   }
@@ -162,18 +161,19 @@ class _MapScreenState extends State<MapScreen> {
     }
     if (permiso == LocationPermission.deniedForever) return;
 
-    _locationSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 5,
-      ),
-    ).listen((Position posicion) {
-      if (mounted) {
-        setState(() {
-          _posicionUsuario = LatLng(posicion.latitude, posicion.longitude);
+    _locationSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 5,
+          ),
+        ).listen((Position posicion) {
+          if (mounted) {
+            setState(() {
+              _posicionUsuario = LatLng(posicion.latitude, posicion.longitude);
+            });
+          }
         });
-      }
-    });
   }
 
   Future<void> _mostrarSheetSiCorresponde() async {
@@ -283,13 +283,8 @@ class _MapScreenState extends State<MapScreen> {
     // Find the parada by name
     final parada = _paradas.firstWhere(
       (p) => p.nombre == stopName,
-      orElse: () => ParadaModel(
-        paradaId: '',
-        nombre: stopName,
-        lat: 0,
-        lon: 0,
-        orden: 0,
-      ),
+      orElse: () =>
+          ParadaModel(paradaId: '', nombre: stopName, lat: 0, lon: 0, orden: 0),
     );
     if (parada.paradaId.isEmpty) return;
 
@@ -300,13 +295,16 @@ class _MapScreenState extends State<MapScreen> {
       context,
       paradaNombre: parada.nombre,
       paradaId: parada.paradaId,
-      etas: response?.buses
-              .map((b) => StopEtaCard(
-                    rutaCodigo: b.rutaCodigo,
-                    destino: b.rutaId,
-                    eta: b.eta,
-                    minutos: _parseMinutos(b.eta),
-                  ))
+      etas:
+          response?.buses
+              .map(
+                (b) => StopEtaCard(
+                  rutaCodigo: b.rutaCodigo,
+                  destino: b.rutaId,
+                  eta: b.eta,
+                  minutos: _parseMinutos(b.eta),
+                ),
+              )
               .toList() ??
           [],
     );
@@ -316,11 +314,8 @@ class _MapScreenState extends State<MapScreen> {
     // Find a bus with this route code and center on it
     final bus = _busAdapters.firstWhere(
       (b) => b.routeCode == routeCode,
-      orElse: () => const BusSesionAdapter(
-        id: '',
-        routeCode: '',
-        position: LatLng(0, 0),
-      ),
+      orElse: () =>
+          const BusSesionAdapter(id: '', routeCode: '', position: LatLng(0, 0)),
     );
     if (bus.position != const LatLng(0, 0)) {
       _mapController.move(bus.position, 15.5);
@@ -353,23 +348,10 @@ class _MapScreenState extends State<MapScreen> {
           // Mapa vectorial a pantalla completa
           Positioned.fill(child: _buildMapOrState(isDark)),
 
-          // SearchPill flotante
-          Positioned(
-            top: MediaQuery.of(context).padding.top + AppSpacing.md,
-            left: AppSpacing.lg,
-            right: AppSpacing.lg,
-            child: SearchPill(
-              label: '¿A dónde vas?',
-              isDark: isDark,
-              onTap: () {},
-              onFilter: () {},
-            ),
-          ),
-
           // FABs flotantes
           Positioned(
             right: AppSpacing.lg,
-            bottom: kBottomNavigationBarHeight + MediaQuery.of(context).padding.bottom + AppSpacing.lg,
+            bottom: MediaQuery.of(context).padding.bottom + AppSpacing.lg,
             child: _buildFABs(isDark),
           ),
 
@@ -410,13 +392,16 @@ class _MapScreenState extends State<MapScreen> {
           // Banner vacío
           if (_flota.isEmpty && !_cargandoRuta && !_emptyBannerDismissed)
             Positioned(
-              bottom: kBottomNavigationBarHeight + MediaQuery.of(context).padding.bottom + AppSpacing.xxl + 60,
+              bottom:
+                  MediaQuery.of(context).padding.bottom + AppSpacing.xxl + 60,
               left: AppSpacing.lg,
               right: AppSpacing.lg,
               child: Material(
                 elevation: 4,
                 borderRadius: BorderRadius.circular(AppRadius.medium),
-                color: isDark ? CanalColors.darkSurface : CanalColors.lightSurface,
+                color: isDark
+                    ? CanalColors.darkSurface
+                    : CanalColors.lightSurface,
                 surfaceTintColor: Colors.transparent,
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.lg),
