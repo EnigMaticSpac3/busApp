@@ -12,6 +12,7 @@ import '../services/api_service.dart';
 import '../services/crowdsourcing_service.dart';
 import '../services/websocket_service.dart';
 import '../widgets/bus_marker_widget.dart';
+import '../widgets/canal_vector_map.dart';
 import '../widgets/crowdsourcing_sheet.dart';
 import '../widgets/stop_marker.dart';
 import '../widgets/stop_detail_sheet.dart';
@@ -272,6 +273,17 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
+  void _onMapEvent(MapEvent event) {
+    setState(() => _mapaCentradoPorUsuario = false);
+    final newZoom = event.camera.zoom;
+    final zoomCambioSignificativo = (newZoom - _currentZoom).abs() >= 1;
+    final cruceUmbral = (_currentZoom < 15 && newZoom >= 15) ||
+                        (_currentZoom >= 15 && newZoom < 15);
+    if (zoomCambioSignificativo || cruceUmbral) {
+      setState(() => _currentZoom = newZoom);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -332,31 +344,15 @@ class _MapScreenState extends State<MapScreen> {
 
     return Stack(
       children: [
-        FlutterMap(
+        CanalVectorMap(
+          isDark: Theme.of(context).brightness == Brightness.dark,
           mapController: _mapController,
-          options: MapOptions(
-            initialCenter: const LatLng(9.0561, -79.4582),
-            initialZoom: 15.0,
-            minZoom: 12.0,
-            maxZoom: 18.0,
-            onPositionChanged: (position, hasGesture) {
-              if (hasGesture) {
-                setState(() => _mapaCentradoPorUsuario = false);
-              }
-              final newZoom = position.zoom;
-              final zoomCambioSignificativo = (newZoom - _currentZoom).abs() >= 1;
-              final cruceUmbral = (_currentZoom < 15 && newZoom >= 15) ||
-                                  (_currentZoom >= 15 && newZoom < 15);
-              if (zoomCambioSignificativo || cruceUmbral) {
-                setState(() => _currentZoom = newZoom);
-              }
-            },
-          ),
+          initialCenter: const LatLng(9.0561, -79.4582),
+          initialZoom: 15.0,
+          minZoom: 12.0,
+          maxZoom: 18.0,
+          onMapEvent: _onMapEvent,
           children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.example.bus_app',
-            ),
             PolylineLayer(
               polylines: [
                 Polyline(
