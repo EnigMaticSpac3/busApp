@@ -5,11 +5,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'theme/export.dart';
+import 'theme/favorites_provider.dart';
+import 'theme/notifications_provider.dart';
+import 'theme/settings_service.dart';
+import 'theme/offline_provider.dart';
 import 'services/api_service.dart';
 import 'services/websocket_service.dart';
 import 'services/crowdsourcing_service.dart';
 import 'services/conductor_service.dart';
 import 'services/auth_service.dart';
+import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/conductor_login_screen.dart';
 import 'screens/conductor_screen.dart';
@@ -38,6 +43,10 @@ class _BusAppState extends State<BusApp> with WidgetsBindingObserver {
   final CrowdsourcingService _crowdsourcingService = CrowdsourcingService();
   final ConductorService _conductorService = ConductorService();
   final AuthService _authService = AuthService();
+  final FavoritesProvider _favoritesProvider = FavoritesProvider();
+  final NotificationsProvider _notificationsProvider = NotificationsProvider();
+  final SettingsService _settingsService = SettingsService();
+  final OfflineProvider _offlineProvider = OfflineProvider();
 
   @override
   void initState() {
@@ -78,6 +87,11 @@ class _BusAppState extends State<BusApp> with WidgetsBindingObserver {
         ChangeNotifierProvider<WebSocketService>.value(value: _wsService),
         ChangeNotifierProvider<CrowdsourcingService>.value(value: _crowdsourcingService),
         ChangeNotifierProvider<ConductorService>.value(value: _conductorService),
+        // New providers
+        ChangeNotifierProvider<FavoritesProvider>.value(value: _favoritesProvider),
+        ChangeNotifierProvider<NotificationsProvider>.value(value: _notificationsProvider),
+        ChangeNotifierProvider<SettingsService>.value(value: _settingsService),
+        ChangeNotifierProvider<OfflineProvider>.value(value: _offlineProvider),
       ],
       child: ListenableBuilder(
         listenable: _livingTheme,
@@ -88,7 +102,9 @@ class _BusAppState extends State<BusApp> with WidgetsBindingObserver {
             theme: _livingTheme.theme,
             initialRoute: '/',
             routes: {
-              '/': (context) => const HomeScreen(),
+              '/': (context) => const SplashScreen(),
+              '/splash': (context) => const SplashScreen(),
+              '/home': (context) => const HomeScreen(),
               '/conductor-login': (context) => const ConductorLoginScreen(),
               '/conductor': (context) {
                 final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
