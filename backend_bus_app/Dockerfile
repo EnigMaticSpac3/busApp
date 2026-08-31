@@ -26,5 +26,5 @@ COPY app/ .
 # Expose port
 EXPOSE 8000
 
-# Run the API
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the API with uvloop + httptools for performance
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--loop", "uvloop", "--http", "httptools"]

@@ -1,38 +1,34 @@
 import 'package:flutter/material.dart';
+import 'canal_colors.dart';
 
-/// Paleta visual oficial de Transita (Brandbook Canal v1.0).
+/// Capa de compatibilidad para AppColors.
+/// Mantiene los nombres de la paleta anterior (canal50-900, amber50-900, etc.)
+/// pero apunta a los colores equivalentes de CanalColors.
 ///
-/// Identidad "Canal" — inspirada en el Canal de Panamá:
-/// - Azul profundo (#004F7C) como primario (canal600)
-/// - Naranja amanecer (#F59D3D) como acento (amber400)
-/// - Rojo señal (#E84C2B) como alerta (signal500)
-///
-/// Jerarquía de la paleta:
-/// 1. Roles semánticos (primary, accent, alert) — uso directo en UI
-/// 2. Rampas tonales (Canal, Amber, Signal, Neutral) — variantes para hover, fondos, borders
+/// DEPRECATED: Usar CanalColors directamente en código nuevo.
 class AppColors {
   // ─────────────────────────────────────────────────────────────
-  // 1. RAMPA CANAL (Azul) — Primary
+  // RAMPA CANAL (Azul) — Primary
   // ─────────────────────────────────────────────────────────────
   static const canal50  = Color(0xFFF0F8FD);
   static const canal100 = Color(0xFFDFF0F9);
   static const canal200 = Color(0xFFB0D4EE);
   static const canal300 = Color(0xFF72B3DD);
-  static const canal400 = Color(0xFF3A8FC9);  // Secondary — Esclusa
+  static const canal400 = Color(0xFF3A8FC9);
   static const canal500 = Color(0xFF1A6B98);
-  static const canal600 = Color(0xFF004F7C);  // PRIMARY — Canal Deep
+  static const canal600 = Color(0xFF004F7C);
   static const canal700 = Color(0xFF003D60);
   static const canal800 = Color(0xFF002D48);
   static const canal900 = Color(0xFF001E30);
 
   // ─────────────────────────────────────────────────────────────
-  // 2. RAMPA AMANECER (Naranja) — Accent
+  // RAMPA AMANECER (Naranja) — Accent
   // ─────────────────────────────────────────────────────────────
   static const amber50  = Color(0xFFFFF9F2);
   static const amber100 = Color(0xFFFEF3E5);
   static const amber200 = Color(0xFFFBDCB8);
   static const amber300 = Color(0xFFF8BC7A);
-  static const amber400 = Color(0xFFF59D3D);  // ACCENT — Amanecer
+  static const amber400 = Color(0xFFF59D3D);
   static const amber500 = Color(0xFFC47200);
   static const amber600 = Color(0xFF9E5800);
   static const amber700 = Color(0xFF7A4000);
@@ -40,16 +36,16 @@ class AppColors {
   static const amber900 = Color(0xFF3D1E00);
 
   // ─────────────────────────────────────────────────────────────
-  // 3. RAMPA SEÑAL (Rojo) — Alert
+  // RAMPA SEÑAL (Rojo) — Alert
   // ─────────────────────────────────────────────────────────────
   static const signal50  = Color(0xFFFFF4F2);
   static const signal200 = Color(0xFFFADDD8);
   static const signal400 = Color(0xFFEF7A63);
-  static const signal500 = Color(0xFFE84C2B);  // ALERT — Señal Roja
+  static const signal500 = Color(0xFFE84C2B);
   static const signal600 = Color(0xFFC02010);
 
   // ─────────────────────────────────────────────────────────────
-  // 4. RAMPA NEUTRO (Grises)
+  // RAMPA NEUTRO (Grises)
   // ─────────────────────────────────────────────────────────────
   static const neutral0   = Color(0xFFFFFFFF);
   static const neutral50  = Color(0xFFF8F9FC);
@@ -64,63 +60,60 @@ class AppColors {
   static const neutral900 = Color(0xFF1A1C24);
 
   // ─────────────────────────────────────────────────────────────
-  // 5. ROLES SEMÁNTICOS
+  // ROLES SEMÁNTICOS
   // ─────────────────────────────────────────────────────────────
 
   // Primary
-  static const primary = Color(0xFF004F7C);         // canal600
-  static const primaryHover = Color(0xFF003D60);    // canal700
-  static const primarySubtle = Color(0xFFF0F8FD);   // canal50
-  static const primaryBorder = Color(0xFF72B3DD);   // canal300
-  static const onPrimary = Color(0xFFFFFFFF);
+  static const primary = CanalColors.primary;
+  static const primaryHover = Color(0xFF003D60);
+  static const primarySubtle = Color(0xFFF0F8FD);
+  static const primaryBorder = Color(0xFF72B3DD);
+  static const onPrimary = Colors.white;
 
   // Secondary
-  static const secondary = Color(0xFF3A8FC9);        // canal400
-  static const secondarySubtle = Color(0xFFDFF0F9);  // canal100
-  static const onSecondary = Color(0xFF002D48);      // canal800
+  static const secondary = Color(0xFF3A8FC9);
+  static const secondarySubtle = Color(0xFFDFF0F9);
+  static const onSecondary = Color(0xFF002D48);
 
   // Accent
-  static const accent = Color(0xFFF59D3D);           // amber400
-  static const accentHover = Color(0xFFC47200);       // amber500
-  static const accentSubtle = Color(0xFFFFF9F2);      // amber50
-  static const onAccent = Color(0xFF3D1E00);          // amber900 — NUNCA blanco sobre accent
+  static const accent = CanalColors.accent;
+  static const accentHover = Color(0xFFC47200);
+  static const accentSubtle = Color(0xFFFFF9F2);
+  static const onAccent = CanalColors.onAccent;
 
   // Alert
-  static const alert = Color(0xFFE84C2B);             // signal500
-  static const alertSubtle = Color(0xFFFFF4F2);       // signal50
-  static const onAlert = Color(0xFFFFFFFF);
+  static const alert = CanalColors.error;
+  static const alertSubtle = Color(0xFFFFF4F2);
+  static const onAlert = Colors.white;
 
   // Text
-  static const textPrimary = Color(0xFF1A1C24);       // neutral900
-  static const textSecondary = Color(0xFF606680);     // neutral600
-  static const textMuted = Color(0xFF8B91A8);         // neutral500
-  static const textDisabled = Color(0xFFB0B5C8);      // neutral400
-  static const textInverse = Color(0xFFFFFFFF);
+  static const textPrimary = CanalColors.lightTextPrimary;
+  static const textSecondary = CanalColors.lightTextSecondary;
+  static const textMuted = CanalColors.lightTextMuted;
+  static const textDisabled = Color(0xFFB0B5C8);
+  static const textInverse = Colors.white;
 
   // Surfaces
-  static const surfacePage = Color(0xFFF8F9FC);       // neutral50
-  static const surfaceCard = Color(0xFFFFFFFF);        // neutral0
-  static const surfaceRaised = Color(0xFFF2F3F7);      // neutral100
-  static const surfaceOverlay = Color.fromRGBO(0, 31, 48, 0.72);  // canal900 con opacidad
+  static const surfacePage = CanalColors.lightBackground;
+  static const surfaceCard = CanalColors.lightSurface;
+  static const surfaceRaised = CanalColors.lightSurface2;
+  static const surfaceOverlay = CanalColors.surfaceOverlay;
 
   // Borders
-  static const border = Color(0xFFE4E6EF);             // neutral200
-  static const borderStrong = Color(0xFFCED2E0);       // neutral300
+  static const border = CanalColors.lightBorder;
+  static const borderStrong = Color(0xFFCED2E0);
 
   // ─────────────────────────────────────────────────────────────
-  // 6. ALIASES RETROCOMPATIBLES (DEPRECATED)
-  //    Mantenidos para no romper widgets/screens existentes.
-  //    Apuntan a los colores equivalentes de la nueva paleta Canal.
-  //    Eliminar gradualmente al migrar cada screen.
+  // ALIASES RETROCOMPATIBLES (DEPRECATED)
   // ─────────────────────────────────────────────────────────────
   @Deprecated('Usar surfaceCard o neutral0 en su lugar')
-  static const white = Color(0xFFFFFFFF);
+  static const white = Colors.white;
 
   @Deprecated('Usar surfacePage en su lugar')
-  static const surface = Color(0xFFF6F7F9);
+  static const surface = CanalColors.lightBackground;
 
   @Deprecated('Usar surfaceRaised en su lugar')
-  static const surfaceDark = Color(0xFFE8ECF1);
+  static const surfaceDark = CanalColors.lightSurface2;
 
   @Deprecated('Usar secondary (canal400) o primary según el contexto')
   static const primaryLight = Color(0xFF5568B5);
@@ -129,10 +122,10 @@ class AppColors {
   static const primaryDark = Color(0xFF172368);
 
   @Deprecated('Usar accent o primary según el contexto')
-  static const success = Color(0xFFC8D527);
+  static const success = CanalColors.success;
 
   @Deprecated('Usar accent o amber según el contexto')
-  static const warning = Color(0xFFE88D67);
+  static const warning = CanalColors.warning;
 
   // Escalas tonales previas — mantenidas para compatibilidad con widgets existentes
   @Deprecated('Usar canal50 en su lugar')
@@ -163,11 +156,11 @@ class AppColors {
   static const orange900 = Color(0xFF7A2F0E);
 
   @Deprecated('Usar neutral50 en su lugar')
-  static const gray50  = Color(0xFFF0F0EF);
+  static const gray50  = CanalColors.lightSurface2;
   @Deprecated('Usar neutral300 o borderStrong en su lugar')
-  static const gray300 = Color(0xFF868684);
+  static const gray300 = CanalColors.lightBorder;
   @Deprecated('Usar neutral600 o textSecondary en su lugar')
-  static const gray600 = Color(0xFF484846);
+  static const gray600 = CanalColors.lightTextSecondary;
   @Deprecated('Usar neutral900 o textPrimary en su lugar')
-  static const gray900 = Color(0xFF101010);
+  static const gray900 = CanalColors.lightTextPrimary;
 }

@@ -66,6 +66,9 @@ class CanalColors {
   // Marcador de bus neutral — cuerpo blanco/oscuro, icono/borde mode-colored
   static const markerBody = Color(0xFFFFFFFF); // light mode marker body
   static const markerBodyDark = Color(0xFF1C2333); // dark mode marker body (darkSurface2)
+  // ── Surface ──
+  static const surfaceOverlay = Color.fromRGBO(0, 31, 48, 0.72);
+
   // ── Semantic ──
   static const success = Color(0xFF00B894); // Walk green — paleta Canal
   static const warning = Color(0xFFF59E0B);
@@ -85,6 +88,8 @@ class CanalColors {
   static const onTintLightError = Color(0xFFF87171);
   static const onTintLightPrimary = Color(0xFF74B6EF);
   static const onTintLightSecondary = Color(0xFF2DD4BF);
+  static const onTintLightSuccess = Color(0xFF34D399);
+  static const onTintLightAccent = Color(0xFFFCD34D);
 
   // ── Offline (gris neutro informativo §04/§05 — NO es error) ──
   static const offline = Color(0xFF9CA3AF); // day

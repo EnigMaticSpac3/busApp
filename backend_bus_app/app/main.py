@@ -1,32 +1,19 @@
 """
-main.py — San Antonio Bus Tracker API
-Correcciones aplicadas vs versión anterior:
-  1. asyncio.Lock para eliminar race condition en motor_gps
-  2. Velocidad calculada desde timestamps reales del GPX (Δdist/Δtime)
-  3. Filtro "ya pasamos" basado en metros reales, no índices arbitrarios
-  4. Manejo de errores con logging en lifespan
-  5. Credenciales leídas desde variables de entorno (.env)
-  
-Fuente de datos: carpeta GTFS local (no requiere importación manual a DB).
-La DB queda reservada para datos dinámicos (crowdsourcing, logs).
+Transita API — Modular architecture.
 """
 
 import asyncio
 import logging
-import math
-import os
-import csv
-import time
-import uuid
 from contextlib import asynccontextmanager
-from pathlib import Path
 
-from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from pydantic import BaseModel
-from typing import Optional, List
+from .core.config import CORS_ORIGINS, APP_TITLE
+from .services.gtfs_service import cargar_gtfs_completo
+from .services.websocket_manager import manager
+from .services.session_store import session_store
+from .routes.api import router
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -37,1212 +24,113 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Configuración
-# ---------------------------------------------------------------------------
-load_dotenv()
-
-# Ruta a la carpeta GTFS — relativa a este archivo (main.py)
-GTFS_DIR = Path(__file__).parent / "gtfs_san_antonio"
-
-# IDs que usamos en nuestro feed GTFS
-SHAPE_ID = "SA_R1"
-TRIP_ID  = "SA_IDA_001"
 
 # ---------------------------------------------------------------------------
-# Conductores autorizados (MVP - gestión manual)
+# Session monitor
 # ---------------------------------------------------------------------------
-
-conductores_autorizados = {
-    "conductor_001": {
-        "nombre": "Juan Pérez",
-        "pin": "1234",
-        "ruta_asignada": "SA_INTERNAL",
-        "activo": True,
-    },
-    "conductor_002": {
-        "nombre": "María Gómez",
-        "pin": "5678",
-        "ruta_asignada": "SA_INTERNAL",
-        "activo": True,
-    },
-}
-
-# ---------------------------------------------------------------------------
-# WebSocket - Connection Manager
-# ---------------------------------------------------------------------------
-
-class ConnectionManager:
-    """Gestiona todas las conexiones WebSocket activas."""
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-        log.info(f"WebSocket conectado. Total: {len(self.active_connections)}")
-
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-            log.info(f"WebSocket desconectado. Total: {len(self.active_connections)}")
-
-    async def broadcast(self, data: dict):
-        """Envía datos a todos los clientes conectados."""
-        if not self.active_connections:
-            return
-        import json
-        mensaje = json.dumps(data)
-        conexiones_muertas = []
-        for connection in self.active_connections:
-            try:
-                await connection.send_text(mensaje)
-            except Exception:
-                conexiones_muertas.append(connection)
-        for conn in conexiones_muertas:
-            if conn in self.active_connections:
-                self.active_connections.remove(conn)
-
-    async def send_personal(self, websocket: WebSocket, data: dict):
-        """Envía datos a un cliente específico."""
-        import json
-        try:
-            await websocket.send_text(json.dumps(data))
-        except Exception as e:
-            log.warning(f"Error enviando a cliente: {e}")
-
-manager = ConnectionManager()
-
-# ---------------------------------------------------------------------------
-# Estado compartido en memoria
-# ---------------------------------------------------------------------------
-
-# Puntos del shape: lista de dicts con lat, lon, dist_acumulada
-ruta_puntos: list = []
-
-# Paradas: lista de dicts con stop_id, nombre, lat, lon, indice_ruta, dist_ruta
-paradas_info: list = []
-
-# Caché de paradas por ruta_id (para el endpoint /api/rutas/{ruta_id}/paradas)
-_paradas_cache: dict[str, list] = {}
-
-# Sesiones activas por ruta (clave: ruta_id)
-sesiones_activas: dict[str, dict] = {}
-_sesiones_lock = asyncio.Lock()
-
-# Sesiones de conductor (clave: conductor_token)
-sesiones_conductor: dict[str, dict] = {}
-_sesiones_conductor_lock = asyncio.Lock()
-
-# Último GPS recibido del conductor (clave: conductor_token)
-ultimo_gps_conductor: dict[str, dict] = {}
-
-# Mapeo de shape_id -> route_code (route_short_name) desde GTFS
-shape_to_route_code: dict[str, str] = {}
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def haversine(lat1, lon1, lat2, lon2) -> float:
-    """Distancia en metros entre dos coordenadas."""
-    R = 6_371_000
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    a = (math.sin(math.radians(lat2 - lat1) / 2) ** 2
-         + math.cos(phi1) * math.cos(phi2)
-         * math.sin(math.radians(lon2 - lon1) / 2) ** 2)
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
-
-def leer_csv_gtfs(nombre_archivo: str) -> list[dict]:
-    """Lee un archivo .txt del feed GTFS y devuelve lista de dicts."""
-    ruta = GTFS_DIR / nombre_archivo
-    if not ruta.exists():
-        raise FileNotFoundError(f"Archivo GTFS no encontrado: {ruta}")
-    with open(ruta, encoding="utf-8") as f:
-        return list(csv.DictReader(f))
-
-
-def gtfs_time_a_segundos(tiempo_str: str) -> int:
-    """
-    Convierte HH:MM:SS de GTFS a segundos totales.
-    GTFS permite horas > 23 para servicios de madrugada (ej: 25:00:00).
-    """
-    h, m, s = tiempo_str.strip().split(":")
-    return int(h) * 3600 + int(m) * 60 + int(s)
-
-
-# ---------------------------------------------------------------------------
-# Carga de datos GTFS
-# ---------------------------------------------------------------------------
-
-def cargar_ruta_desde_gtfs() -> list:
-    """
-    Lee shapes.txt y devuelve los puntos del shape SHAPE_ID
-    ordenados por secuencia, con distancia acumulada incluida.
-    """
-    shapes = leer_csv_gtfs("shapes.txt")
-    puntos = [
-        {
-            "lat":       float(row["shape_pt_lat"]),
-            "lon":       float(row["shape_pt_lon"]),
-            "secuencia": int(row["shape_pt_sequence"]),
-            "dist":      float(row["shape_dist_traveled"]),
-        }
-        for row in shapes
-        if row["shape_id"] == SHAPE_ID
-    ]
-    puntos.sort(key=lambda p: p["secuencia"])
-    log.info(f"Ruta cargada desde GTFS: {len(puntos)} puntos, "
-             f"{puntos[-1]['dist']/1000:.2f} km")
-    return puntos
-
-
-def cargar_paradas_desde_gtfs(ruta: list) -> list:
-    """
-    Lee stops.txt y stop_times.txt para el TRIP_ID definido.
-    Calcula el índice del punto de ruta más cercano a cada parada
-    usando shape_dist_traveled para el filtro 'ya pasamos'.
-    """
-    stops_raw = leer_csv_gtfs("stops.txt")
-    stops_dict = {
-        row["stop_id"]: {
-            "nombre": row["stop_name"],
-            "lat":    float(row["stop_lat"]),
-            "lon":    float(row["stop_lon"]),
-        }
-        for row in stops_raw
-    }
-
-    stop_times = leer_csv_gtfs("stop_times.txt")
-    paradas_del_trip = sorted(
-        [row for row in stop_times if row["trip_id"] == TRIP_ID],
-        key=lambda r: int(r["stop_sequence"])
-    )
-
-    paradas = []
-    for row in paradas_del_trip:
-        stop_id = row["stop_id"]
-        if stop_id not in stops_dict:
-            log.warning(f"stop_id '{stop_id}' en stop_times no existe en stops.txt, omitido.")
-            continue
-
-        stop = stops_dict[stop_id]
-        dist_gtfs = float(row.get("shape_dist_traveled", 0))
-
-        # Buscamos el índice más cercano por distancia acumulada
-        # Es más preciso que buscar por coordenadas cuando el GPX tiene puntos densos
-        indice_cercano = min(
-            range(len(ruta)),
-            key=lambda i: abs(ruta[i]["dist"] - dist_gtfs)
-        )
-
-        paradas.append({
-            "stop_id":     stop_id,
-            "nombre":      stop["nombre"],
-            "lat":         stop["lat"],
-            "lon":         stop["lon"],
-            "indice_ruta": indice_cercano,
-            "dist_ruta":   dist_gtfs,
-            "llegada_seg": gtfs_time_a_segundos(row["arrival_time"]),
-        })
-
-    log.info(f"Paradas cargadas desde GTFS: {len(paradas)}")
-    return paradas
-
-
-def _obtener_paradas_por_ruta(ruta_id: str) -> list:
-    """
-    Obtiene las paradas para una ruta específica desde GTFS.
-    Usa caché para evitar leer archivos repetidamente.
-
-    En GTFS la relación es:
-      route_id (routes.txt) → trip_id (trips.txt) → stop_times.txt → stops.txt
-
-    Returns:
-        Lista de dicts con stop_id, nombre, lat, lon, indice_ruta, dist_ruta, llegada_seg.
-        Si la ruta no existe o no tiene paradas, devuelve lista vacía.
-    """
-    if ruta_id in _paradas_cache:
-        return _paradas_cache[ruta_id]
-
-    try:
-        # Paso 1: Buscar trip_ids para esta ruta en trips.txt
-        trips = leer_csv_gtfs("trips.txt")
-        trips_ruta = [t for t in trips if t.get("route_id", "") == ruta_id]
-
-        if not trips_ruta:
-            log.info(f"Ruta '{ruta_id}' no encontrada en trips.txt — sin paradas")
-            _paradas_cache[ruta_id] = []
-            return []
-
-        # Usar el primer trip (asumiendo viaje de ida)
-        trip_id = trips_ruta[0]["trip_id"]
-        shape_id = trips_ruta[0].get("shape_id", "")
-
-        # Paso 2: Cargar el shape para este trip (necesitamos los puntos
-        #          para calcular indice_ruta por shape_dist_traveled)
-        shapes = leer_csv_gtfs("shapes.txt")
-        shape_puntos = [
-            {
-                "lat":       float(row["shape_pt_lat"]),
-                "lon":       float(row["shape_pt_lon"]),
-                "secuencia": int(row["shape_pt_sequence"]),
-                "dist":      float(row["shape_dist_traveled"]),
-            }
-            for row in shapes
-            if row["shape_id"] == shape_id
-        ]
-        shape_puntos.sort(key=lambda p: p["secuencia"])
-
-        if not shape_puntos:
-            log.warning(f"No se encontró shape '{shape_id}' para trip '{trip_id}'")
-            _paradas_cache[ruta_id] = []
-            return []
-
-        # Paso 3: Cargar diccionario de stops
-        stops_raw = leer_csv_gtfs("stops.txt")
-        stops_dict = {
-            row["stop_id"]: {
-                "nombre": row["stop_name"],
-                "lat":    float(row["stop_lat"]),
-                "lon":    float(row["stop_lon"]),
-            }
-            for row in stops_raw
-        }
-
-        # Paso 4: Cargar stop_times para este trip
-        stop_times = leer_csv_gtfs("stop_times.txt")
-        paradas_del_trip = sorted(
-            [row for row in stop_times if row["trip_id"] == trip_id],
-            key=lambda r: int(r["stop_sequence"])
-        )
-
-        if not paradas_del_trip:
-            log.warning(f"No se encontraron stop_times para trip '{trip_id}'")
-            _paradas_cache[ruta_id] = []
-            return []
-
-        # Paso 5: Construir lista de paradas
-        paradas = []
-        for row in paradas_del_trip:
-            stop_id = row["stop_id"]
-            if stop_id not in stops_dict:
-                log.warning(f"stop_id '{stop_id}' en stop_times no existe en stops.txt, omitido.")
-                continue
-
-            stop = stops_dict[stop_id]
-            dist_gtfs = float(row.get("shape_dist_traveled", 0))
-
-            # Buscar el índice más cercano por distancia acumulada
-            indice_cercano = min(
-                range(len(shape_puntos)),
-                key=lambda i: abs(shape_puntos[i]["dist"] - dist_gtfs)
-            )
-
-            paradas.append({
-                "stop_id":     stop_id,
-                "nombre":      stop["nombre"],
-                "lat":         stop["lat"],
-                "lon":         stop["lon"],
-                "indice_ruta": indice_cercano,
-                "dist_ruta":   dist_gtfs,
-                "llegada_seg": gtfs_time_a_segundos(row["arrival_time"]),
-            })
-
-        log.info(f"Paradas cargadas para ruta '{ruta_id}': {len(paradas)} paradas (trip={trip_id})")
-        _paradas_cache[ruta_id] = paradas
-        return paradas
-
-    except FileNotFoundError as e:
-        log.error(f"Archivo GTFS no encontrado al cargar paradas para ruta '{ruta_id}': {e}")
-        _paradas_cache[ruta_id] = []
-        return []
-    except Exception as e:
-        log.error(f"Error inesperado al cargar paradas para ruta '{ruta_id}': {e}")
-        _paradas_cache[ruta_id] = []
-        return []
-
-
-# ---------------------------------------------------------------------------
-# Monitor de sesiones
-# ---------------------------------------------------------------------------
-
 async def monitor_sesiones():
-    """
-    Tarea asíncrona que corre cada 60 segundos.
-    Limpia contribuidores inactivos y sesiones perdidas.
-    También detecta geofencing: si la posición promedio está a > 100m de la ruta.
-    """
+    """Verifica y limpia sesiones expiradas cada 60 segundos."""
     while True:
         await asyncio.sleep(60)
-        ahora = time.time()
+        try:
+            import time
 
-        async with _sesiones_lock:
+            ahora = time.time()
             rutas_a_eliminar = []
-            for ruta_id, sesion in sesiones_activas.items():
-                # Limpiar contribuidores sin señal en 60s
-                sesion["contribuidores"] = {
-                    uid: datos for uid, datos in sesion["contribuidores"].items()
-                    if ahora - datos["ts"] < 60
-                }
 
-                # Calcular tiempo sin señal de la sesión
-                seg_sin_senal = ahora - sesion["ultimo_gps"]
+            async with session_store._sesiones_lock:
+                for ruta_id, sesion in session_store.sesiones_activas.items():
+                    seg_sin_senal = ahora - sesion["ultimo_gps"]
 
-                # Eliminar sesión si:
-                # 1. No hay contribuidores Y pasaron 10 min sin señal, O
-                # 2. Hay contribuidores pero ninguno ha enviado señal en 10 min
-                contribuidores_activos = [
-                    c for c in sesion["contribuidores"].values()
-                    if ahora - c["ts"] < TIMEOUT_ELIMINAR_S
-                ]
-                if (not sesion["contribuidores"] or not contribuidores_activos) and seg_sin_senal > TIMEOUT_ELIMINAR_S:
-                    rutas_a_eliminar.append(ruta_id)
-                    continue
+                    # Geofencing
+                    if sesion["lat"] != 0.0:
+                        from .services.geo_utils import haversine
+                        from .services.gtfs_service import get_ruta_puntos
+                        from .core.config import GEOFENCING_SALIDA_M, TIMEOUT_ELIMINAR_S
+                        from .core.config import TIMEOUT_INCIERTO_S, TIMEOUT_PERDIDO_S
 
-                # Geofencing: verificar que la posición está en la ruta
-                if sesion["lat"] != 0.0 and ruta_puntos:
-                    dist_min = min(
-                        haversine(sesion["lat"], sesion["lon"], p["lat"], p["lon"])
-                        for p in ruta_puntos
-                    )
-                    if dist_min > GEOFENCING_SALIDA_M:
-                        log.info(f"Sesión {sesion['session_id']} fuera de ruta "
-                                 f"({dist_min:.0f}m) → marcada como perdida")
+                        ruta_puntos = get_ruta_puntos()
+                        if ruta_puntos:
+                            dist_min = min(
+                                haversine(sesion["lat"], sesion["lon"], p["lat"], p["lon"])
+                                for p in ruta_puntos
+                            )
+                            if dist_min > GEOFENCING_SALIDA_M:
+                                log.info(
+                                    f"Sesión {sesion['session_id']} fuera de ruta "
+                                    f"({dist_min:.0f}m) → marcada como perdida"
+                                )
+                                sesion["modo"] = "perdido"
+
+                    # Timeout
+                    if seg_sin_senal > TIMEOUT_ELIMINAR_S:
+                        contribuidores_activos = any(
+                            ahora - c["ts"] < 30
+                            for c in sesion["contribuidores"].values()
+                        )
+                        if not contribuidores_activos:
+                            rutas_a_eliminar.append(ruta_id)
+                            continue
+
+                    # Modo basado en tiempo
+                    if seg_sin_senal < TIMEOUT_INCIERTO_S:
+                        sesion["modo"] = "activo"
+                    elif seg_sin_senal < TIMEOUT_PERDIDO_S:
+                        sesion["modo"] = "incierto"
+                    else:
                         sesion["modo"] = "perdido"
 
-                # Actualizar modo basado en tiempo sin señal
-                seg_sin_senal = ahora - sesion["ultimo_gps"]
-                if seg_sin_senal < TIMEOUT_INCIERTO_S:
-                    sesion["modo"] = "activo"
-                elif seg_sin_senal < TIMEOUT_PERDIDO_S:
-                    sesion["modo"] = "incierto"
-                else:
-                    sesion["modo"] = "perdido"
+                for ruta_id in rutas_a_eliminar:
+                    log.info(
+                        f"Sesión {session_store.sesiones_activas[ruta_id]['session_id']} "
+                        f"eliminada por timeout"
+                    )
+                    del session_store.sesiones_activas[ruta_id]
 
-            for ruta_id in rutas_a_eliminar:
-                log.info(f"Sesión {sesiones_activas[ruta_id]['session_id']} eliminada por timeout")
-                del sesiones_activas[ruta_id]
+                if rutas_a_eliminar:
+                    log.info(f"Monitor: {len(session_store.sesiones_activas)} sesiones activas")
 
-            if rutas_a_eliminar:
-                log.info(f"Monitor: {len(sesiones_activas)} sesiones activas")
+        except Exception as e:
+            log.error(f"Error en monitor de sesiones: {e}")
 
 
 # ---------------------------------------------------------------------------
 # Lifespan
 # ---------------------------------------------------------------------------
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global ruta_puntos, paradas_info, shape_to_route_code
-
     try:
-        log.info(f"Cargando datos desde: {GTFS_DIR}")
-
-        if not GTFS_DIR.exists():
-            raise FileNotFoundError(
-                f"No se encontró la carpeta GTFS en {GTFS_DIR}. "
-                "Verifica que 'gtfs_san_antonio/' esté dentro de 'app/'."
-            )
-
-        ruta_puntos  = cargar_ruta_desde_gtfs()
-        paradas_info = cargar_paradas_desde_gtfs(ruta_puntos)
-
-        if len(ruta_puntos) < 10:
-            raise ValueError("La ruta tiene muy pocos puntos, verifica shapes.txt")
-        if not paradas_info:
-            raise ValueError("No se encontraron paradas para el trip_id configurado")
-
-        # Precargar paradas para todas las rutas disponibles
-        try:
-            rutas = leer_csv_gtfs("routes.txt")
-            for ruta in rutas:
-                r_id = ruta.get("route_id", "")
-                if r_id:
-                    _obtener_paradas_por_ruta(r_id)
-            log.info(f"Paradas precargadas para {len(rutas)} ruta(s) en caché")
-        except Exception as e:
-            log.warning(f"No se pudieron precargar todas las rutas: {e}")
-
-        # Construir mapeo shape_id -> route_code desde GTFS
-        try:
-            trips_data = leer_csv_gtfs("trips.txt")
-            routes_data = leer_csv_gtfs("routes.txt")
-            route_id_to_code = {
-                r["route_id"]: r.get("route_short_name", r["route_id"])
-                for r in routes_data
-            }
-            for trip in trips_data:
-                sid = trip["shape_id"]
-                rid = trip["route_id"]
-                shape_to_route_code[sid] = route_id_to_code.get(rid, sid)
-            log.info(f"Rutas cargadas desde GTFS: {shape_to_route_code}")
-        except Exception as e:
-            log.warning(f"No se pudo cargar mapping de rutas: {e}")
-
+        cargar_gtfs_completo()
     except Exception as e:
         log.error(f"Error al cargar datos GTFS: {e}")
         raise
 
-    log.info("✅ Datos GTFS cargados, esperando contribuidores...")
+    log.info("Datos GTFS cargados, esperando contribuidores...")
 
-    # Iniciar monitor de sesiones
     tarea_monitor = asyncio.create_task(monitor_sesiones())
-    log.info("✅ Monitor de sesiones iniciado (cada 60s)")
+    log.info("Monitor de sesiones iniciado (cada 60s)")
 
     yield
+
+    # Graceful shutdown
     tarea_monitor.cancel()
-    log.info("Monitor de sesiones detenido.")
+    await manager.close_all("Server shutting down")
     log.info("Servidor detenido.")
 
 
 # ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
+app = FastAPI(title=APP_TITLE, lifespan=lifespan)
 
-app = FastAPI(title="San Antonio Bus Tracker API", lifespan=lifespan)
+# CORS — whitelist desde .env
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
-
-@app.get("/api/ruta")
-async def get_ruta():
-    return {
-        "ruta_id": SHAPE_ID,
-        "puntos": [{"lat": p["lat"], "lon": p["lon"]} for p in ruta_puntos],
-    }
-
-
-@app.get("/api/rutas")
-async def get_rutas():
-    """
-    Lista todas las rutas disponibles leyendo del GTFS.
-    Incluye cuántos buses activos tiene cada ruta en ese momento.
-    """
-    try:
-        rutas = leer_csv_gtfs("routes.txt")
-    except FileNotFoundError:
-        return {"rutas": [], "error": "GTFS routes.txt no encontrado"}
-
-    async with _sesiones_lock:
-        resultado = []
-        ahora = time.time()
-        for ruta in rutas:
-            ruta_id = ruta.get("route_id", "")
-            buses_activos = 0
-
-            if ruta_id in sesiones_activas:
-                sesion = sesiones_activas[ruta_id]
-                seg = ahora - sesion["ultimo_gps"]
-                if seg < 600:  # sesión no expirada
-                    buses_activos = sum(
-                        1 for c in sesion["contribuidores"].values()
-                        if ahora - c["ts"] < 30
-                    )
-
-            resultado.append({
-                "ruta_id":       ruta_id,
-                "codigo":        ruta.get("route_short_name", ""),
-                "nombre":        ruta.get("route_long_name", ""),
-                "color":         ruta.get("route_color", "007BFF"),
-                "buses_activos": buses_activos,
-            })
-
-    return {"rutas": resultado}
-
-
-@app.get("/api/rutas/{ruta_id}/paradas")
-async def get_paradas_ruta(ruta_id: str):
-    """
-    Devuelve las paradas de una ruta en orden, con su posición
-    en la secuencia del recorrido.
-
-    Usa el ruta_id recibido en la URL para buscar las paradas
-    correspondientes en el GTFS. La relación es:
-      route_id → trip_id (trips.txt) → stop_times → stops
-    """
-    # Cargar paradas dinámicamente según el ruta_id
-    paradas = _obtener_paradas_por_ruta(ruta_id)
-    paradas_ordenadas = sorted(paradas, key=lambda p: p.get("indice_ruta", 0))
-
-    return {
-        "ruta_id": ruta_id,
-        "paradas": [
-            {
-                "stop_id":   p["stop_id"],
-                "nombre":    p["nombre"],
-                "lat":       p["lat"],
-                "lon":       p["lon"],
-                "secuencia": i,
-            }
-            for i, p in enumerate(paradas_ordenadas)
-        ]
-    }
-
-
-@app.get("/api/flota")
-async def get_flota():
-    """Devuelve sesiones activas (buses dinámicos desde contribuidores y conductores)."""
-    async with _sesiones_lock:
-        return _get_flota_data_completa()
-
-
-def _get_flota_data() -> list:
-    """Función helper para obtener datos de la flota."""
-    resultado = []
-    ahora = time.time()
-    for sesion in sesiones_activas.values():
-        seg = ahora - sesion["ultimo_gps"]
-        if seg > 600:
-            continue
-        modo = (
-            "activo"   if seg < 15 else
-            "incierto" if seg < 300 else
-            "perdido"
-        )
-        contribuidores_activos = sum(
-            1 for c in sesion["contribuidores"].values()
-            if ahora - c["ts"] < 30
-        )
-        resultado.append({
-            "bus_id":             f"Bus-{sesion['session_id']}",
-            "session_id":         sesion["session_id"],
-            "ruta_id":            sesion["ruta_id"],
-            "lat":                sesion["lat"],
-            "lon":                sesion["lon"],
-            "vel_ms":             sesion["vel_ms"],
-            "indice_ruta":        sesion.get("indice_ruta", 0),
-            "modo":               modo,
-            "segundos_sin_senal": round(seg, 0),
-            "contribuidores_activos": contribuidores_activos,
-        })
-    return resultado
-
-
-def _get_flota_data_completa() -> list:
-    """Función helper para obtener datos de la flota (pasajeros + conductores)."""
-    resultado = []
-    ahora = time.time()
-
-    # Obtener IDs de sesiones de conductor para excluir de pasajeros
-    session_ids_conductores = {s["session_id"] for s in sesiones_conductor.values()}
-
-    # Sesiones de pasajeros (excluir las que ya tienen conductor activo)
-    for sesion in sesiones_activas.values():
-        # No mostrar si esta sesión ya es un conductor
-        if sesion["session_id"] in session_ids_conductores:
-            continue
-
-        seg = ahora - sesion["ultimo_gps"]
-        if seg > 600:
-            continue
-        modo = (
-            "activo"   if seg < 15 else
-            "incierto" if seg < 300 else
-            "perdido"
-        )
-        contribuidores_activos = sum(
-            1 for c in sesion["contribuidores"].values()
-            if ahora - c["ts"] < 30
-        )
-        resultado.append({
-            "bus_id":             f"Bus-{sesion['session_id']}",
-            "session_id":         sesion["session_id"],
-            "ruta_id":            sesion["ruta_id"],
-            "lat":                sesion["lat"],
-            "lon":                sesion["lon"],
-            "vel_ms":             sesion["vel_ms"],
-            "indice_ruta":        sesion.get("indice_ruta", 0),
-            "modo":               modo,
-            "tipo":               "pasajero",
-            "segundos_sin_senal": round(seg, 0),
-            "contribuidores_activos": contribuidores_activos,
-        })
-
-    # Sesiones de conductor (no expiran como pasajeros)
-    for token, sesion in sesiones_conductor.items():
-        seg = ahora - sesion.get("ultimo_gps", sesion["inicio"])
-        resultado.append({
-            "bus_id":             f"Conductor-{sesion['session_id'][:4]}",
-            "session_id":         sesion["session_id"],
-            "ruta_id":            sesion["ruta_id"],
-            "lat":                sesion.get("lat", 0.0),
-            "lon":                sesion.get("lon", 0.0),
-            "vel_ms":             sesion.get("vel_ms", 0.0),
-            "indice_ruta":        0,
-            "modo":               "activo",
-            "tipo":               "conductor",
-            "segundos_sin_senal": round(seg, 0),
-            "contribuidores_activos": 1,
-        })
-
-    return resultado
-
-
-# WebSocket endpoint
-@app.websocket("/ws/flota")
-async def websocket_endpoint(websocket: WebSocket):
-    """
-    Endpoint WebSocket para tiempo real de la flota.
-    El cliente se conecta y recibe actualizaciones de la flota
-    cada vez que hay un cambio.
-    """
-    await manager.connect(websocket)
-    try:
-        # Enviar estado actual al conectarse
-        async with _sesiones_lock:
-            flota_actual = _get_flota_data_completa()
-
-        await manager.send_personal(websocket, {"tipo": "flota", "datos": flota_actual})
-
-        # Mantener conexión abierta y escuchar mensajes (ping/pong)
-        while True:
-            await websocket.receive_text()
-
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-
-
-@app.get("/api/parada-cercana/{id_bus}")
-async def get_parada_cercana(id_bus: str):
-    """Busca la parada más cercana para un bus específico."""
-    # Extraer session_id del formato "Bus-{session_id}" o usar directamente
-    session_id = id_bus.replace("Bus-", "") if id_bus.startswith("Bus-") else id_bus
-
-    async with _sesiones_lock:
-        sesion = sesiones_activas.get(session_id)
-
-    if not sesion:
-        return {"error": "Bus no encontrado"}
-
-    UMBRAL_METROS = 30.0
-    parada_futura = None
-    dist_minima   = float("inf")
-
-    indice_ruta = sesion.get("indice_ruta", 0)
-    for parada in paradas_info:
-        dist_bus_parada = haversine(sesion["lat"], sesion["lon"], parada["lat"], parada["lon"])
-        if (parada["indice_ruta"] > indice_ruta
-                and dist_bus_parada > UMBRAL_METROS
-                and dist_bus_parada < dist_minima):
-            dist_minima   = dist_bus_parada
-            parada_futura = parada
-
-    if parada_futura:
-        vel     = sesion["vel_ms"] if sesion["vel_ms"] > 1.0 else (4 * 1000 / 3600)
-        minutos = int((dist_minima / vel) // 60)
-        eta     = f"{minutos} min" if minutos > 0 else "Menos de 1 min"
-        return {
-            "parada":    parada_futura["nombre"],
-            "distancia": round(dist_minima, 0),
-            "eta":       eta,
-        }
-
-    return {"parada": "Fin de recorrido", "eta": "--", "distancia": 0}
-
-
-@app.get("/api/eta-parada/{parada_id}")
-async def get_eta_parada(parada_id: str):
-    """
-    Dado un stop_id, devuelve todos los buses activos que se acercan
-    a esa parada con su ETA calculada.
-    """
-    # Buscar la parada en los datos cargados
-    parada = None
-    for p in paradas_info:
-        if p["stop_id"] == parada_id:
-            parada = p
-            break
-
-    if not parada:
-        return {"error": "Parada no encontrada"}
-
-    ahora = time.time()
-    buses = []
-
-    async with _sesiones_lock:
-        for ruta_id, sesion in sesiones_activas.items():
-            # Ignorar sesiones sin posición válida
-            if sesion["lat"] == 0.0 and sesion["lon"] == 0.0:
-                continue
-
-            # Ignorar sesiones expiradas (> 600s sin señal)
-            seg_sin_senal = ahora - sesion["ultimo_gps"]
-            if seg_sin_senal > 600:
-                continue
-
-            indice_sesion = sesion.get("indice_ruta", 0)
-            indice_parada = parada["indice_ruta"]
-
-            # Solo incluir si la parada está adelante del bus
-            if indice_sesion >= indice_parada:
-                continue
-
-            # Distancia entre el bus y la parada
-            distancia = haversine(
-                sesion["lat"], sesion["lon"],
-                parada["lat"], parada["lon"],
-            )
-
-            # Velocidad del bus (m/s), mínimo 1.11 m/s (~4 km/h)
-            velocidad = sesion.get("vel_ms", 0)
-            if velocidad <= 1.0:
-                velocidad = 1.11
-
-            # ETA en minutos
-            minutos = (distancia / velocidad) / 60
-            if minutos < 1:
-                eta = "Menos de 1 min"
-            else:
-                eta = f"{int(round(minutos))} min"
-
-            # Código de ruta (route_short_name) o fallback a ruta_id
-            ruta_codigo = shape_to_route_code.get(ruta_id, ruta_id)
-
-            buses.append({
-                "ruta_id":     ruta_id,
-                "ruta_codigo": ruta_codigo,
-                "bus_id":      f"Bus-{sesion['session_id']}",
-                "eta":         eta,
-                "distancia":   round(distancia, 0),
-            })
-
-    # Ordenar por distancia ascendente (más cercano primero)
-    buses.sort(key=lambda b: b["distancia"])
-
-    return {
-        "parada":    parada["nombre"],
-        "parada_id": parada_id,
-        "buses":     buses,
-    }
-
-
-class InicioSesion(BaseModel):
-    """Payload para iniciar sesión en un bus."""
-    usuario_id: str
-    ruta_id: str = "SA_R1"
-
-
-@app.post("/api/iniciar-sesion-bus")
-async def iniciar_sesion_bus(payload: InicioSesion):
-    """
-    Cuando el usuario confirma "estoy en el bus", llama este endpoint.
-    Si ya existe sesión activa para esa ruta → devuelve el session_id existente.
-    Si no existe → crea una nueva sesión.
-    """
-    async with _sesiones_lock:
-        # Si ya existe sesión activa para esta ruta, unirse a ella
-        if payload.ruta_id in sesiones_activas:
-            sesion = sesiones_activas[payload.ruta_id]
-            # Agregar contribuidor si no estaba
-            if payload.usuario_id not in sesion["contribuidores"]:
-                sesion["contribuidores"][payload.usuario_id] = {
-                    "lat": 0.0, "lon": 0.0, "vel_ms": 0.0, "ts": time.time()
-                }
-                log.info(f"Usuario {payload.usuario_id} se unió a sesión {sesion['session_id']}")
-            return {"session_id": sesion["session_id"], "nueva": False, "ruta_id": payload.ruta_id}
-
-        # Crear nueva sesión
-        session_id = str(uuid.uuid4())[:8]
-        sesiones_activas[payload.ruta_id] = {
-            "session_id":    session_id,
-            "ruta_id":       payload.ruta_id,
-            "lat":           0.0,
-            "lon":           0.0,
-            "vel_ms":        0.0,
-            "indice_ruta":   0,
-            "modo":          "incierto",
-            "ultimo_gps":    time.time(),
-            "contribuidores": {
-                payload.usuario_id: {"lat": 0.0, "lon": 0.0, "vel_ms": 0.0, "ts": time.time()}
-            }
-        }
-        log.info(f"Nueva sesión {session_id} creada para ruta {payload.ruta_id}")
-        return {"session_id": session_id, "nueva": True, "ruta_id": payload.ruta_id}
-
-
-class AuthConductor(BaseModel):
-    """Payload para autenticar conductor."""
-    pin: str
-
-
-@app.post("/api/auth/conductor")
-async def auth_conductor(payload: AuthConductor):
-    """
-    Verifica PIN y devuelve token de sesión conductor.
-    Los conductores son gestionados manualmente.
-    """
-    for conductor_id, conductor in conductores_autorizados.items():
-        if conductor["pin"] == payload.pin and conductor["activo"]:
-            token = str(uuid.uuid4())
-            return {
-                "token": token,
-                "conductor_id": conductor_id,
-                "nombre": conductor["nombre"],
-                "ruta_asignada": conductor["ruta_asignada"]
-            }
-    return {"error": "PIN inválido o conductor inactivo"}, 401
-
-
-class GpsConductor(BaseModel):
-    """Payload para recibir GPS del conductor cada 5 segundos."""
-    conductor_token: str
-    lat: float
-    lng: float
-    accuracy: Optional[float] = None
-    speed: Optional[float] = None
-
-
-class SesionConductor(BaseModel):
-    """Payload para iniciar sesión de conductor."""
-    conductor_token: str
-    ruta_id: str
-
-
-class FinSesionConductor(BaseModel):
-    """Payload para finalizar sesión de conductor."""
-    conductor_token: str
-
-
-@app.post("/api/sesion-conductor")
-async def iniciar_sesion_conductor(payload: SesionConductor):
-    """
-    Inicia sesión de conductor - GPS activo por 8-12 horas.
-    La sesión no tiene timeout de 5 minutos como pasajero.
-    """
-    async with _sesiones_conductor_lock:
-        # Verificar si ya existe sesión para este token
-        if payload.conductor_token in sesiones_conductor:
-            sesion = sesiones_conductor[payload.conductor_token]
-            return {
-                "session_id": sesion["session_id"],
-                "estado": "activa",
-                "inicio": sesion["inicio"],
-            }
-
-        # Crear nueva sesión de conductor
-        session_id = str(uuid.uuid4())[:8]
-
-        sesiones_conductor[payload.conductor_token] = {
-            "session_id": session_id,
-            "conductor_token": payload.conductor_token,
-            "ruta_id": payload.ruta_id,
-            "inicio": time.time(),
-            "activo": True,
-            "tipo": "conductor",
-        }
-
-        log.info(f"Sesión conductor iniciada: {session_id} para ruta {payload.ruta_id}")
-
-        return {
-            "session_id": session_id,
-            "estado": "activa",
-            "inicio": time.time(),
-        }
-
-
-@app.post("/api/sesion-conductor/fin")
-async def finalizar_sesion_conductor(payload: FinSesionConductor):
-    """
-    Finaliza una sesión de conductor.
-    Elimina la sesión de sesiones_conductor y emite broadcast WebSocket.
-    Es idempotente: si el token no existe, responde 200 OK igual.
-    """
-    try:
-        async with _sesiones_conductor_lock:
-            if payload.conductor_token in sesiones_conductor:
-                del sesiones_conductor[payload.conductor_token]
-                log.info(
-                    f"Sesión de conductor {payload.conductor_token[:8]}... finalizada"
-                )
-
-                # Broadcast a todos los clientes WebSocket
-                flota_actual = _get_flota_data_completa()
-                await manager.broadcast({"tipo": "flota", "datos": flota_actual})
-            else:
-                log.info(
-                    f"Intento de finalizar sesión de conductor inexistente: "
-                    f"{payload.conductor_token[:8]}... (idempotente)"
-                )
-
-        return {"estado": "ok", "mensaje": "sesión finalizada"}
-    except Exception as e:
-        log.error(f"Error al finalizar sesión de conductor: {e}")
-        # Idempotente: siempre devolvemos OK
-        return {"estado": "ok", "mensaje": "sesión finalizada"}
-
-
-@app.post("/api/gps-conductor")
-async def gps_conductor(payload: GpsConductor):
-    """
-    Recibe GPS del conductor cada 5 segundos.
-    Actualiza ultimo_gps_conductor y la sesión de conductor si existe.
-    """
-    ahora = time.time()
-
-    # Validar coordenadas
-    if not (-90 <= payload.lat <= 90 and -180 <= payload.lng <= 180):
-        return {"estado": "rechazado", "motivo": "coordenadas inválidas"}
-
-    # Actualizar ultimo_gps_conductor
-    ultimo_gps_conductor[payload.conductor_token] = {
-        "lat": payload.lat,
-        "lng": payload.lng,
-        "accuracy": payload.accuracy,
-        "speed": payload.speed,
-        "timestamp": ahora,
-    }
-
-    # Si existe sesión de conductor, actualizar posición
-    async with _sesiones_conductor_lock:
-        if payload.conductor_token in sesiones_conductor:
-            sesion = sesiones_conductor[payload.conductor_token]
-            sesion["lat"] = payload.lat
-            sesion["lon"] = payload.lng
-            sesion["vel_ms"] = payload.speed if payload.speed is not None else 0.0
-            sesion["ultimo_gps"] = ahora
-            sesion["activo"] = True
-
-            # Broadcast a todos los clientes WebSocket
-            flota_actual = _get_flota_data_completa()
-            await manager.broadcast({"tipo": "flota", "datos": flota_actual})
-
-            return {
-                "estado": "aceptado",
-                "session_id": sesion["session_id"],
-                "bus_id": f"Conductor-{sesion['session_id'][:4]}",
-            }
-
-    return {
-        "estado": "rechazado",
-        "motivo": "sesión de conductor no encontrada. Inicia sesión primero con /api/sesion-conductor",
-    }
-
-
-# Umbrales del map matching
-UMBRAL_DISTANCIA_RUTA_M  = 35.0   # metros — qué tan cerca debe estar de la ruta
-UMBRAL_VELOCIDAD_MIN_MS  = 1.4    # m/s — ~5 km/h mínimo para considerar que va en bus
-UMBRAL_VELOCIDAD_MAX_MS  = 16.0   # m/s — ~60 km/h máximo razonable para un bus urbano
-UMBRAL_ASIGNACION_BUS_M  = 200.0  # metros — distancia máxima al bus más cercano
-
-# Umbrales del monitor de sesiones
-GEOFENCING_SALIDA_M   = 100.0  # metros para detectar salida de ruta
-TIMEOUT_INCIERTO_S    = 15     # segundos sin señal → modo incierto
-TIMEOUT_PERDIDO_S     = 300   # 5 minutos → modo perdido
-TIMEOUT_ELIMINAR_S    = 600   # 10 minutos → eliminar sesión
-VENTANA_PROMEDIO_S    = 30    # segundos de ventana para promedio ponderado
- 
- 
-class UbicacionUsuario(BaseModel):
-    """Payload que envía el celular del usuario contribuidor."""
-    session_id:   Optional[str] = None  # ID de sesión pasajero (del endpoint iniciar-sesion-bus)
-    conductor_token: Optional[str] = None  # Token de conductor (si es modo conductor)
-    usuario_id:   str           # ID anónimo generado en el celular (UUID)
-    ruta_id:      str = "SA_R1" # ruta por defecto
-    lat:          float
-    lon:          float
-    velocidad_ms: float        # velocidad reportada por el GPS del celular
-    precision_m:  Optional[float] = None  # precisión GPS en metros (opcional)
-
-
-def _calcular_promedio_ponderado(contribuidores: dict) -> tuple[float, float, float]:
-    """
-    Promedio ponderado por recencia — señales más recientes tienen más peso.
-    Ignora contribuidores sin señal en los últimos 30 segundos.
-    """
-    ahora = time.time()
-    lats, lons, vels, pesos = [], [], [], []
-
-    for datos in contribuidores.values():
-        antiguedad = ahora - datos["ts"]
-        if antiguedad > 30 or datos["lat"] == 0.0:
-            continue
-        peso = 1.0 / (1.0 + antiguedad)  # más reciente = más peso
-        lats.append(datos["lat"] * peso)
-        lons.append(datos["lon"] * peso)
-        vels.append(datos["vel_ms"] * peso)
-        pesos.append(peso)
-
-    if not pesos:
-        return 0.0, 0.0, 0.0
-
-    total = sum(pesos)
-    return sum(lats)/total, sum(lons)/total, sum(vels)/total
- 
- 
-def map_matching(lat: float, lon: float, velocidad_ms: float, precision_m: Optional[float] = None) -> Optional[dict]:
-    """
-    Determina si el usuario está en una zona donde podría estar en un bus.
-    En el modelo de sesiones, la asignación a una sesión específica se hace
-    en contribuir_ubicacion basándose en la ruta activa.
-
-    Algoritmo:
-      1. ¿La precisión GPS es aceptable? (rechazar si > 50m)
-      2. ¿Está dentro de UMBRAL_DISTANCIA_RUTA_M metros de algún punto de la ruta?
-      3. ¿Su velocidad es coherente con un bus en movimiento?
-
-    Devuelve un dict con información de ubicación válida o None si no aplica.
-    """
-    # Filtro 0: precisión GPS suficiente
-    if precision_m is not None and precision_m > 50:
-        return None
-
-    # Filtro 1: velocidad coherente con un bus
-    if not (UMBRAL_VELOCIDAD_MIN_MS <= velocidad_ms <= UMBRAL_VELOCIDAD_MAX_MS):
-        return None
-
-    # Filtro 2: proximidad a la ruta — buscamos el punto más cercano
-    dist_minima_ruta = float("inf")
-    indice_cercano = 0
-    for i, punto in enumerate(ruta_puntos):
-        d = haversine(lat, lon, punto["lat"], punto["lon"])
-        if d < dist_minima_ruta:
-            dist_minima_ruta = d
-            indice_cercano = i
-
-    if dist_minima_ruta > UMBRAL_DISTANCIA_RUTA_M:
-        return None
-
-    # La asignación a sesión se hace en contribuir_ubicacion
-    return {
-        "valido": True,
-        "distancia_ruta": dist_minima_ruta,
-        "indice_ruta": indice_cercano,
-    }
- 
- 
-@app.post("/api/contribuir-ubicacion")
-async def contribuir_ubicacion(payload: UbicacionUsuario):
-    """
-    Recibe la ubicación GPS de un usuario contribuidor.
-    Recibe session_id y ruta_id para identificar la sesión específica.
-    La posición del bus se calcula como promedio ponderado de contribuidores.
-    """
-    # Validación básica de coordenadas
-    if not (-90 <= payload.lat <= 90 and -180 <= payload.lon <= 180):
-        return {"estado": "rechazado", "motivo": "coordenadas inválidas"}
-
-    # Ignorar señales con precisión GPS muy baja (ej: >50m de error)
-    if payload.precision_m is not None and payload.precision_m > 50:
-        return {"estado": "rechazado", "motivo": "precisión GPS insuficiente"}
-
-    # Determinar si es conductor o pasajero
-    es_conductor = payload.conductor_token is not None
-
-    # Map matching: solo para pasajeros (el conductor es el bus)
-    if not es_conductor:
-        map_result = map_matching(payload.lat, payload.lon, payload.velocidad_ms, payload.precision_m)
-        if map_result is None:
-            return {
-                "estado":  "ignorado",
-                "motivo":  "ubicación fuera de ruta o velocidad incompatible con bus",
-                "lat":     payload.lat,
-                "lon":     payload.lon,
-                "vel_ms":  payload.velocidad_ms,
-            }
-    else:
-        map_result = {"indice_ruta": 0}
-
-    if es_conductor:
-        # Modo conductor - buscar o crear sesión de conductor
-        async with _sesiones_conductor_lock:
-            if payload.conductor_token not in sesiones_conductor:
-                # Crear sesión de conductor automáticamente
-                session_id = str(uuid.uuid4())[:8]
-                sesiones_conductor[payload.conductor_token] = {
-                    "session_id": session_id,
-                    "conductor_token": payload.conductor_token,
-                    "ruta_id": payload.ruta_id,
-                    "lat": payload.lat,
-                    "lon": payload.lon,
-                    "vel_ms": payload.velocidad_ms,
-                    "inicio": time.time(),
-                    "ultimo_gps": time.time(),
-                    "activo": True,
-                    "tipo": "conductor",
-                }
-                log.info(f"Sesión conductor creada automáticamente: {session_id}")
-
-            sesion = sesiones_conductor[payload.conductor_token]
-            sesion["lat"] = payload.lat
-            sesion["lon"] = payload.lon
-            sesion["vel_ms"] = payload.velocidad_ms
-            sesion["ultimo_gps"] = time.time()
-            sesion["activo"] = True
-
-            # Broadcast a todos los clientes WebSocket
-            flota_actual = _get_flota_data_completa()
-            await manager.broadcast({"tipo": "flota", "datos": flota_actual})
-
-            return {
-                "estado": "aceptado",
-                "tipo": "conductor",
-                "session_id": sesion["session_id"],
-                "bus_id": f"Conductor-{sesion['session_id'][:4]}",
-                "lat": payload.lat,
-                "lon": payload.lon,
-            }
-
-    # Modo pasajero - sesión tradicional
-    async with _sesiones_lock:
-        if payload.ruta_id not in sesiones_activas:
-            return {
-                "estado": "rechazado",
-                "motivo": "no hay sesión activa para esta ruta. Llama primero a /api/iniciar-sesion-bus",
-                "ruta_id": payload.ruta_id,
-            }
-
-        sesion = sesiones_activas[payload.ruta_id]
-
-        # Verificar que el session_id coincida (opcional)
-        if sesion["session_id"] != payload.session_id:
-            return {
-                "estado": "rechazado",
-                "motivo": "session_id no coincide con la sesión activa",
-                "session_id": payload.session_id,
-            }
-
-        ahora = time.time()
-
-        # Actualizar o agregar contribuidor
-        sesion["contribuidores"][payload.usuario_id] = {
-            "lat": payload.lat,
-            "lon": payload.lon,
-            "vel_ms": payload.velocidad_ms,
-            "ts": ahora,
-        }
-
-        # Calcular promedio ponderado usando helper
-        lat_prom, lon_prom, vel_prom = _calcular_promedio_ponderado(sesion["contribuidores"])
-        if lat_prom != 0.0:
-            sesion["lat"] = lat_prom
-            sesion["lon"] = lon_prom
-            sesion["vel_ms"] = vel_prom
-
-        sesion["ultimo_gps"] = ahora
-        sesion["indice_ruta"] = map_result.get("indice_ruta", 0)
-        sesion["modo"] = "activo"
-
-        # Broadcast a todos los clientes WebSocket
-        flota_actual = _get_flota_data_completa()
-        await manager.broadcast({"tipo": "flota", "datos": flota_actual})
-
-    log.info(
-        f"Contribución aceptada: usuario={payload.usuario_id} "
-        f"→ sesión {sesion['session_id']} ({payload.lat:.5f}, {payload.lon:.5f}) "
-        f"vel={payload.velocidad_ms:.1f} m/s"
-    )
-
-    return {
-        "estado":    "aceptado",
-        "session_id": sesion["session_id"],
-        "bus_id":    f"Bus-{sesion['session_id']}",
-        "lat":       sesion["lat"],
-        "lon":       sesion["lon"],
-    }
+# Incluir rutas
+app.include_router(router)

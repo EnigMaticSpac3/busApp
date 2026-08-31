@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:bus_app/theme/export.dart';
 
 class AppPrimaryButton extends StatelessWidget {
@@ -46,7 +45,8 @@ class AppPrimaryButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadius.medium),
           ),
           elevation: 2,
-          textStyle: GoogleFonts.inter(
+          textStyle: const TextStyle(
+            fontFamily: 'Inter',
             fontSize: 16,
             fontWeight: FontWeight.w600,
             color: AppColors.white,

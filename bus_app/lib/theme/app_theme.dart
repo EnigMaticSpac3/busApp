@@ -1,211 +1,316 @@
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
-import 'app_radius.dart';
-import 'app_spacing.dart';
-import 'app_typography.dart';
+import 'canal_colors.dart';
 
 class AppTheme {
-  /// Canal Day theme (light mode) — used by LivingTheme.
-  static ThemeData get canalDay => light;
+  AppTheme._();
 
-  /// Canal Sunset theme (dark mode) — used by LivingTheme.
+  static ThemeData get canalDay {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      fontFamily: 'Inter',
+      scaffoldBackgroundColor: CanalColors.lightBackground,
+      colorScheme: ColorScheme.light(
+        primary: CanalColors.primary,
+        secondary: CanalColors.secondary,
+        surface: CanalColors.lightSurface,
+        error: CanalColors.error,
+        onPrimary: Colors.white,
+        onSecondary: CanalColors.onSecondary,
+        onSurface: CanalColors.lightTextPrimary,
+        onError: CanalColors.onError,
+      ),
+      textTheme: ThemeData.light().textTheme.apply(fontFamily: 'Inter').copyWith(
+        displayLarge: TextStyle(
+          fontSize: 32,
+          fontWeight: FontWeight.w700,
+          color: CanalColors.lightTextPrimary,
+        ),
+        headlineLarge: TextStyle(
+          fontSize: 26,
+          fontWeight: FontWeight.w700,
+          color: CanalColors.lightTextPrimary,
+        ),
+        headlineMedium: TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.w600,
+          color: CanalColors.lightTextPrimary,
+        ),
+        titleLarge: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: CanalColors.lightTextPrimary,
+        ),
+        titleMedium: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: CanalColors.lightTextPrimary,
+        ),
+        bodyLarge: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
+          color: CanalColors.lightTextPrimary,
+        ),
+        bodyMedium: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          color: CanalColors.lightTextSecondary,
+        ),
+        bodySmall: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w400,
+          color: CanalColors.lightTextMuted,
+        ),
+        labelLarge: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: CanalColors.lightTextPrimary,
+        ),
+        labelMedium: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: CanalColors.lightTextSecondary,
+        ),
+        labelSmall: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.5,
+          color: CanalColors.lightTextMuted,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: CanalColors.lightSurface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: CanalColors.lightBorder, width: 0.5),
+        ),
+        clipBehavior: Clip.antiAlias,
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: CanalColors.lightSurface,
+        foregroundColor: CanalColors.lightTextPrimary,
+        elevation: 0,
+        centerTitle: false,
+        titleTextStyle: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: CanalColors.lightTextPrimary,
+        ),
+      ),
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: CanalColors.lightSurface,
+        selectedItemColor: CanalColors.primary,
+        unselectedItemColor: CanalColors.lightTextMuted,
+        type: BottomNavigationBarType.fixed,
+        elevation: 0,
+        selectedLabelStyle: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      dividerTheme: DividerThemeData(
+        color: CanalColors.lightBorder,
+        thickness: 1,
+        space: 0,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: CanalColors.accent,
+          foregroundColor: CanalColors.onAccent,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: CanalColors.lightSurface,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        hintStyle: TextStyle(
+          fontSize: 15,
+          color: CanalColors.lightTextMuted,
+        ),
+      ),
+    );
+  }
+
   static ThemeData get canalSunset {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppColors.primary,
-      primary: AppColors.primary,
-      secondary: AppColors.secondary,
-      surface: const Color(0xFF151A23),
-      brightness: Brightness.dark,
-    );
-
     return ThemeData(
       useMaterial3: true,
-      colorScheme: colorScheme,
-      textTheme: AppTypography.textTheme,
       brightness: Brightness.dark,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF151A23),
-        foregroundColor: Color(0xFFF8FAFC),
+      fontFamily: 'Inter',
+      scaffoldBackgroundColor: CanalColors.darkBackground,
+      colorScheme: ColorScheme.dark(
+        primary: CanalColors.primary,
+        secondary: CanalColors.secondary,
+        surface: CanalColors.darkSurface,
+        error: CanalColors.error,
+        onPrimary: Colors.white,
+        onSecondary: CanalColors.onSecondary,
+        onSurface: CanalColors.darkTextPrimary,
+        onError: CanalColors.onError,
+      ),
+      textTheme: ThemeData.dark().textTheme.apply(fontFamily: 'Inter')
+          .copyWith(
+            displayLarge: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w700,
+              color: CanalColors.darkTextPrimary,
+            ),
+            headlineLarge: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              color: CanalColors.darkTextPrimary,
+            ),
+            headlineMedium: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              color: CanalColors.darkTextPrimary,
+            ),
+            titleLarge: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: CanalColors.darkTextPrimary,
+            ),
+            titleMedium: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: CanalColors.darkTextPrimary,
+            ),
+            bodyLarge: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w400,
+              color: CanalColors.darkTextPrimary,
+            ),
+            bodyMedium: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              color: CanalColors.darkTextSecondary,
+            ),
+            bodySmall: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              color: CanalColors.darkTextMuted,
+            ),
+            labelLarge: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: CanalColors.darkTextPrimary,
+            ),
+            labelMedium: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: CanalColors.darkTextSecondary,
+            ),
+            labelSmall: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.5,
+              color: CanalColors.darkTextMuted,
+            ),
+          ),
+      cardTheme: CardThemeData(
+        color: CanalColors.darkSurface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: CanalColors.darkBorder, width: 0.5),
+        ),
+        clipBehavior: Clip.antiAlias,
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: CanalColors.darkBackground,
+        foregroundColor: CanalColors.darkTextPrimary,
         elevation: 0,
         centerTitle: false,
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: const Color(0xFF151A23),
-        indicatorColor: AppColors.primary.withValues(alpha: 0.12),
-        iconTheme: WidgetStateProperty.resolveWith((Set<WidgetState> states) {
-          if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: AppColors.primary);
-          }
-          return const IconThemeData(color: Color(0xFF64748B));
-        }),
-        labelTextStyle: WidgetStateProperty.resolveWith((Set<WidgetState> states) {
-          if (states.contains(WidgetState.selected)) {
-            return AppTypography.textTheme.labelMedium?.copyWith(color: AppColors.primary);
-          }
-          return AppTypography.textTheme.labelMedium?.copyWith(color: const Color(0xFF64748B));
-        }),
-      ),
-      cardTheme: CardThemeData(
-        color: const Color(0xFF1C2333),
-        elevation: 2,
-        margin: const EdgeInsets.only(bottom: AppSpacing.md),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.medium),
+        titleTextStyle: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: CanalColors.darkTextPrimary,
         ),
       ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg, vertical: AppSpacing.xl,
-          ),
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: CanalColors.darkSurface,
+        selectedItemColor: CanalColors.primary,
+        unselectedItemColor: CanalColors.darkTextMuted,
+        type: BottomNavigationBarType.fixed,
+        elevation: 0,
+        selectedLabelStyle: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      dividerTheme: DividerThemeData(
+        color: CanalColors.darkBorder,
+        thickness: 1,
+        space: 0,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: CanalColors.accentDark,
+          foregroundColor: CanalColors.onAccentDark,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.medium),
+            borderRadius: BorderRadius.circular(12),
           ),
-        ),
-      ),
-      bottomSheetTheme: const BottomSheetThemeData(
-        showDragHandle: false,
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.large)),
+          textStyle: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.medium),
-          borderSide: const BorderSide(color: Color(0xFF1E293B)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.medium),
-          borderSide: const BorderSide(color: Color(0xFF1E293B)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.medium),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
-        ),
+        filled: true,
+        fillColor: CanalColors.darkSurface,
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.md,
+          horizontal: 16,
+          vertical: 14,
         ),
-      ),
-      chipTheme: ChipThemeData(
-        backgroundColor: AppColors.primarySubtle,
-        labelStyle: const TextStyle(color: AppColors.primary),
-        side: BorderSide.none,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
-      ),
-      dividerTheme: const DividerThemeData(
-        color: Color(0xFF1E293B),
-        thickness: 1,
-        space: 1,
+        hintStyle: TextStyle(
+          fontSize: 15,
+          color: CanalColors.darkTextMuted,
+        ),
       ),
     );
   }
 
-  static ThemeData get light {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppColors.primary,
-      primary: AppColors.primary,
-      secondary: AppColors.secondary,
-      surface: AppColors.surfaceCard,
-    );
+  static TextStyle get monoData => TextStyle(
+        fontFamily: 'JetBrains Mono',
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+      );
 
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: colorScheme,
-      textTheme: AppTypography.textTheme,
-
-      appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.onPrimary,
-        elevation: 0,
-        centerTitle: false,
-      ),
-
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.surfaceCard,
-        indicatorColor: AppColors.primary.withValues(alpha: 0.12),
-        iconTheme: WidgetStateProperty.resolveWith((Set<WidgetState> states) {
-          if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: AppColors.primary);
-          }
-          return const IconThemeData(color: AppColors.textDisabled);
-        }),
-        labelTextStyle: WidgetStateProperty.resolveWith((Set<WidgetState> states) {
-          if (states.contains(WidgetState.selected)) {
-            return AppTypography.textTheme.labelMedium?.copyWith(color: AppColors.primary);
-          }
-          return AppTypography.textTheme.labelMedium?.copyWith(color: AppColors.textDisabled);
-        }),
-      ),
-
-      cardTheme: CardThemeData(
-        color: AppColors.surfaceCard,
-        elevation: 2,
-        margin: const EdgeInsets.only(bottom: AppSpacing.md),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.medium),
-        ),
-      ),
-
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.onPrimary,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg, vertical: AppSpacing.xl,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.medium),
-          ),
-        ),
-      ),
-
-      bottomSheetTheme: const BottomSheetThemeData(
-        showDragHandle: false,
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.large)),
-        ),
-      ),
-
-      inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.medium),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.medium),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.medium),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.md,
-        ),
-      ),
-
-      chipTheme: ChipThemeData(
-        backgroundColor: AppColors.primarySubtle,
-        labelStyle: const TextStyle(color: AppColors.primary),
-        side: BorderSide.none,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-        ),
-      ),
-
-      dividerTheme: const DividerThemeData(
-        color: AppColors.border,
-        thickness: 1,
-        space: 1,
-      ),
-    );
-  }
+  static TextStyle get monoDataLarge => TextStyle(
+        fontFamily: 'JetBrains Mono',
+        fontSize: 36,
+        fontWeight: FontWeight.w700,
+        height: 1.1,
+      );
 }

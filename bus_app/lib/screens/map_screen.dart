@@ -46,10 +46,11 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  final _api = ApiService();
-  final _crowdsourcing = CrowdsourcingService();
+  late final ApiService _api;
+  late final CrowdsourcingService _crowdsourcing;
   final _mapController = MapController();
   WebSocketService? _wsService;
+  bool _initialized = false;
 
   List<LatLng> _routePoints = [];
   List<BusSesion> _flota = [];
@@ -90,22 +91,32 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
-    _crowdsourcing.addListener(_onCrowdsourcingChange);
-    _wsService = WebSocketService();
-    _wsService!.addListener(_onWsChange);
-    _iniciarWebSocket();
-    _cargarRuta();
-    _iniciarPolling();
-    _iniciarUbicacion();
-    _cargarRutas();
-    _mostrarSheetSiCorresponde();
-    _loadEmptyBannerPreference();
-
     if (widget.coordenadasIniciales != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _mapController.move(widget.coordenadasIniciales!, widget.zoomInicial);
         widget.onMapaCentrado?.call();
       });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      _api = context.read<ApiService>();
+      _crowdsourcing = context.read<CrowdsourcingService>();
+      _wsService = context.read<WebSocketService>();
+      _wsService!.addListener(_onWsChange);
+      _crowdsourcing.addListener(_onCrowdsourcingChange);
+
+      _iniciarWebSocket();
+      _cargarRuta();
+      _iniciarPolling();
+      _iniciarUbicacion();
+      _cargarRutas();
+      _mostrarSheetSiCorresponde();
+      _loadEmptyBannerPreference();
     }
   }
 

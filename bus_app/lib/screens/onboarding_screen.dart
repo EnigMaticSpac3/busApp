@@ -63,6 +63,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Skip button (top-right)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
               child: Row(
@@ -89,6 +90,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ],
               ),
             ),
+            // PageView slides
             Expanded(
               child: PageView.builder(
                 controller: _controller,
@@ -97,6 +99,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 itemBuilder: (_, i) => _buildSlide(_slides[i]),
               ),
             ),
+            // Bottom bar: animated dots + next button
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
               child: Row(
@@ -165,6 +168,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Spacer(flex: 1),
+          // Dark card with icon
           Container(
             height: 280,
             width: double.infinity,
@@ -181,6 +185,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
           const Spacer(flex: 1),
+          // Slide counter badge
           Row(
             children: [
               Container(
@@ -205,6 +210,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ],
           ),
           const SizedBox(height: 12),
+          // Title
           Text(
             slide.title,
             style: const TextStyle(
@@ -216,6 +222,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
           const SizedBox(height: 12),
+          // Subtitle
           Text(
             slide.subtitle,
             style: const TextStyle(
@@ -244,5 +251,3 @@ class _OnboardingSlide {
     required this.color,
   });
 }
-
-

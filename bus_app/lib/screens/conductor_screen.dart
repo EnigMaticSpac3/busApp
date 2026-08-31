@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bus_app/theme/export.dart';
 import '../services/api_service.dart';
@@ -22,7 +23,7 @@ class ConductorScreen extends StatefulWidget {
 }
 
 class _ConductorScreenState extends State<ConductorScreen> {
-  final _api = ApiService();
+  late final ApiService _api;
   bool _isTracking = false;
   Position? _currentPosition;
   Timer? _gpsTimer;
@@ -41,6 +42,12 @@ class _ConductorScreenState extends State<ConductorScreen> {
   void initState() {
     super.initState();
     _checkPermissions();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _api = context.read<ApiService>();
   }
 
   @override

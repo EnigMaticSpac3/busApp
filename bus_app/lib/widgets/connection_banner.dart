@@ -15,18 +15,18 @@ class ConnectionBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Offline es estado informativo (§04/§05), NO error: fondo slate neutro
-    // con texto blanco pasa AA en ambos modos (7.6:1 light / 4.7:1 dark).
     const banner = CanalColors.offlineDark;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: banner,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
+    return Semantics(
+      label: 'Sin conexión. Mostrando datos de $lastUpdated',
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: banner,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
         children: [
           const Icon(Icons.cloud_off_rounded, size: 16, color: CanalColors.darkTextPrimary),
           const SizedBox(width: 10),
@@ -76,6 +76,7 @@ class ConnectionBanner extends StatelessWidget {
             ),
         ],
       ),
+    ),
     );
   }
 }
