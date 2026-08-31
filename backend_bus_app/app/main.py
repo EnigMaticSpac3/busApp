@@ -123,6 +123,9 @@ ruta_puntos: list = []
 # Paradas: lista de dicts con stop_id, nombre, lat, lon, indice_ruta, dist_ruta
 paradas_info: list = []
 
+# Caché de paradas por ruta_id (para el endpoint /api/rutas/{ruta_id}/paradas)
+_paradas_cache: dict[str, list] = {}
+
 # Sesiones activas por ruta (clave: ruta_id)
 sesiones_activas: dict[str, dict] = {}
 _sesiones_lock = asyncio.Lock()
@@ -133,6 +136,9 @@ _sesiones_conductor_lock = asyncio.Lock()
 
 # Último GPS recibido del conductor (clave: conductor_token)
 ultimo_gps_conductor: dict[str, dict] = {}
+
+# Mapeo de shape_id -> route_code (route_short_name) desde GTFS
+shape_to_route_code: dict[str, str] = {}
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -245,6 +251,119 @@ def cargar_paradas_desde_gtfs(ruta: list) -> list:
     return paradas
 
 
+def _obtener_paradas_por_ruta(ruta_id: str) -> list:
+    """
+    Obtiene las paradas para una ruta específica desde GTFS.
+    Usa caché para evitar leer archivos repetidamente.
+
+    En GTFS la relación es:
+      route_id (routes.txt) → trip_id (trips.txt) → stop_times.txt → stops.txt
+
+    Returns:
+        Lista de dicts con stop_id, nombre, lat, lon, indice_ruta, dist_ruta, llegada_seg.
+        Si la ruta no existe o no tiene paradas, devuelve lista vacía.
+    """
+    if ruta_id in _paradas_cache:
+        return _paradas_cache[ruta_id]
+
+    try:
+        # Paso 1: Buscar trip_ids para esta ruta en trips.txt
+        trips = leer_csv_gtfs("trips.txt")
+        trips_ruta = [t for t in trips if t.get("route_id", "") == ruta_id]
+
+        if not trips_ruta:
+            log.info(f"Ruta '{ruta_id}' no encontrada en trips.txt — sin paradas")
+            _paradas_cache[ruta_id] = []
+            return []
+
+        # Usar el primer trip (asumiendo viaje de ida)
+        trip_id = trips_ruta[0]["trip_id"]
+        shape_id = trips_ruta[0].get("shape_id", "")
+
+        # Paso 2: Cargar el shape para este trip (necesitamos los puntos
+        #          para calcular indice_ruta por shape_dist_traveled)
+        shapes = leer_csv_gtfs("shapes.txt")
+        shape_puntos = [
+            {
+                "lat":       float(row["shape_pt_lat"]),
+                "lon":       float(row["shape_pt_lon"]),
+                "secuencia": int(row["shape_pt_sequence"]),
+                "dist":      float(row["shape_dist_traveled"]),
+            }
+            for row in shapes
+            if row["shape_id"] == shape_id
+        ]
+        shape_puntos.sort(key=lambda p: p["secuencia"])
+
+        if not shape_puntos:
+            log.warning(f"No se encontró shape '{shape_id}' para trip '{trip_id}'")
+            _paradas_cache[ruta_id] = []
+            return []
+
+        # Paso 3: Cargar diccionario de stops
+        stops_raw = leer_csv_gtfs("stops.txt")
+        stops_dict = {
+            row["stop_id"]: {
+                "nombre": row["stop_name"],
+                "lat":    float(row["stop_lat"]),
+                "lon":    float(row["stop_lon"]),
+            }
+            for row in stops_raw
+        }
+
+        # Paso 4: Cargar stop_times para este trip
+        stop_times = leer_csv_gtfs("stop_times.txt")
+        paradas_del_trip = sorted(
+            [row for row in stop_times if row["trip_id"] == trip_id],
+            key=lambda r: int(r["stop_sequence"])
+        )
+
+        if not paradas_del_trip:
+            log.warning(f"No se encontraron stop_times para trip '{trip_id}'")
+            _paradas_cache[ruta_id] = []
+            return []
+
+        # Paso 5: Construir lista de paradas
+        paradas = []
+        for row in paradas_del_trip:
+            stop_id = row["stop_id"]
+            if stop_id not in stops_dict:
+                log.warning(f"stop_id '{stop_id}' en stop_times no existe en stops.txt, omitido.")
+                continue
+
+            stop = stops_dict[stop_id]
+            dist_gtfs = float(row.get("shape_dist_traveled", 0))
+
+            # Buscar el índice más cercano por distancia acumulada
+            indice_cercano = min(
+                range(len(shape_puntos)),
+                key=lambda i: abs(shape_puntos[i]["dist"] - dist_gtfs)
+            )
+
+            paradas.append({
+                "stop_id":     stop_id,
+                "nombre":      stop["nombre"],
+                "lat":         stop["lat"],
+                "lon":         stop["lon"],
+                "indice_ruta": indice_cercano,
+                "dist_ruta":   dist_gtfs,
+                "llegada_seg": gtfs_time_a_segundos(row["arrival_time"]),
+            })
+
+        log.info(f"Paradas cargadas para ruta '{ruta_id}': {len(paradas)} paradas (trip={trip_id})")
+        _paradas_cache[ruta_id] = paradas
+        return paradas
+
+    except FileNotFoundError as e:
+        log.error(f"Archivo GTFS no encontrado al cargar paradas para ruta '{ruta_id}': {e}")
+        _paradas_cache[ruta_id] = []
+        return []
+    except Exception as e:
+        log.error(f"Error inesperado al cargar paradas para ruta '{ruta_id}': {e}")
+        _paradas_cache[ruta_id] = []
+        return []
+
+
 # ---------------------------------------------------------------------------
 # Monitor de sesiones
 # ---------------------------------------------------------------------------
@@ -316,7 +435,7 @@ async def monitor_sesiones():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global ruta_puntos, paradas_info
+    global ruta_puntos, paradas_info, shape_to_route_code
 
     try:
         log.info(f"Cargando datos desde: {GTFS_DIR}")
@@ -334,6 +453,33 @@ async def lifespan(app: FastAPI):
             raise ValueError("La ruta tiene muy pocos puntos, verifica shapes.txt")
         if not paradas_info:
             raise ValueError("No se encontraron paradas para el trip_id configurado")
+
+        # Precargar paradas para todas las rutas disponibles
+        try:
+            rutas = leer_csv_gtfs("routes.txt")
+            for ruta in rutas:
+                r_id = ruta.get("route_id", "")
+                if r_id:
+                    _obtener_paradas_por_ruta(r_id)
+            log.info(f"Paradas precargadas para {len(rutas)} ruta(s) en caché")
+        except Exception as e:
+            log.warning(f"No se pudieron precargar todas las rutas: {e}")
+
+        # Construir mapeo shape_id -> route_code desde GTFS
+        try:
+            trips_data = leer_csv_gtfs("trips.txt")
+            routes_data = leer_csv_gtfs("routes.txt")
+            route_id_to_code = {
+                r["route_id"]: r.get("route_short_name", r["route_id"])
+                for r in routes_data
+            }
+            for trip in trips_data:
+                sid = trip["shape_id"]
+                rid = trip["route_id"]
+                shape_to_route_code[sid] = route_id_to_code.get(rid, sid)
+            log.info(f"Rutas cargadas desde GTFS: {shape_to_route_code}")
+        except Exception as e:
+            log.warning(f"No se pudo cargar mapping de rutas: {e}")
 
     except Exception as e:
         log.error(f"Error al cargar datos GTFS: {e}")
@@ -367,7 +513,10 @@ app.add_middleware(
 
 @app.get("/api/ruta")
 async def get_ruta():
-    return {"puntos": [{"lat": p["lat"], "lon": p["lon"]} for p in ruta_puntos]}
+    return {
+        "ruta_id": SHAPE_ID,
+        "puntos": [{"lat": p["lat"], "lon": p["lon"]} for p in ruta_puntos],
+    }
 
 
 @app.get("/api/rutas")
@@ -413,10 +562,14 @@ async def get_paradas_ruta(ruta_id: str):
     """
     Devuelve las paradas de una ruta en orden, con su posición
     en la secuencia del recorrido.
+
+    Usa el ruta_id recibido en la URL para buscar las paradas
+    correspondientes en el GTFS. La relación es:
+      route_id → trip_id (trips.txt) → stop_times → stops
     """
-    # Filtrar paradas por ruta_id si hay múltiples rutas
-    # Por ahora usamos paradas_info que corresponde a la ruta actual
-    paradas_ordenadas = sorted(paradas_info, key=lambda p: p.get("indice_ruta", 0))
+    # Cargar paradas dinámicamente según el ruta_id
+    paradas = _obtener_paradas_por_ruta(ruta_id)
+    paradas_ordenadas = sorted(paradas, key=lambda p: p.get("indice_ruta", 0))
 
     return {
         "ruta_id": ruta_id,
@@ -594,6 +747,82 @@ async def get_parada_cercana(id_bus: str):
     return {"parada": "Fin de recorrido", "eta": "--", "distancia": 0}
 
 
+@app.get("/api/eta-parada/{parada_id}")
+async def get_eta_parada(parada_id: str):
+    """
+    Dado un stop_id, devuelve todos los buses activos que se acercan
+    a esa parada con su ETA calculada.
+    """
+    # Buscar la parada en los datos cargados
+    parada = None
+    for p in paradas_info:
+        if p["stop_id"] == parada_id:
+            parada = p
+            break
+
+    if not parada:
+        return {"error": "Parada no encontrada"}
+
+    ahora = time.time()
+    buses = []
+
+    async with _sesiones_lock:
+        for ruta_id, sesion in sesiones_activas.items():
+            # Ignorar sesiones sin posición válida
+            if sesion["lat"] == 0.0 and sesion["lon"] == 0.0:
+                continue
+
+            # Ignorar sesiones expiradas (> 600s sin señal)
+            seg_sin_senal = ahora - sesion["ultimo_gps"]
+            if seg_sin_senal > 600:
+                continue
+
+            indice_sesion = sesion.get("indice_ruta", 0)
+            indice_parada = parada["indice_ruta"]
+
+            # Solo incluir si la parada está adelante del bus
+            if indice_sesion >= indice_parada:
+                continue
+
+            # Distancia entre el bus y la parada
+            distancia = haversine(
+                sesion["lat"], sesion["lon"],
+                parada["lat"], parada["lon"],
+            )
+
+            # Velocidad del bus (m/s), mínimo 1.11 m/s (~4 km/h)
+            velocidad = sesion.get("vel_ms", 0)
+            if velocidad <= 1.0:
+                velocidad = 1.11
+
+            # ETA en minutos
+            minutos = (distancia / velocidad) / 60
+            if minutos < 1:
+                eta = "Menos de 1 min"
+            else:
+                eta = f"{int(round(minutos))} min"
+
+            # Código de ruta (route_short_name) o fallback a ruta_id
+            ruta_codigo = shape_to_route_code.get(ruta_id, ruta_id)
+
+            buses.append({
+                "ruta_id":     ruta_id,
+                "ruta_codigo": ruta_codigo,
+                "bus_id":      f"Bus-{sesion['session_id']}",
+                "eta":         eta,
+                "distancia":   round(distancia, 0),
+            })
+
+    # Ordenar por distancia ascendente (más cercano primero)
+    buses.sort(key=lambda b: b["distancia"])
+
+    return {
+        "parada":    parada["nombre"],
+        "parada_id": parada_id,
+        "buses":     buses,
+    }
+
+
 class InicioSesion(BaseModel):
     """Payload para iniciar sesión en un bus."""
     usuario_id: str
@@ -676,6 +905,11 @@ class SesionConductor(BaseModel):
     ruta_id: str
 
 
+class FinSesionConductor(BaseModel):
+    """Payload para finalizar sesión de conductor."""
+    conductor_token: str
+
+
 @app.post("/api/sesion-conductor")
 async def iniciar_sesion_conductor(payload: SesionConductor):
     """
@@ -711,6 +945,37 @@ async def iniciar_sesion_conductor(payload: SesionConductor):
             "estado": "activa",
             "inicio": time.time(),
         }
+
+
+@app.post("/api/sesion-conductor/fin")
+async def finalizar_sesion_conductor(payload: FinSesionConductor):
+    """
+    Finaliza una sesión de conductor.
+    Elimina la sesión de sesiones_conductor y emite broadcast WebSocket.
+    Es idempotente: si el token no existe, responde 200 OK igual.
+    """
+    try:
+        async with _sesiones_conductor_lock:
+            if payload.conductor_token in sesiones_conductor:
+                del sesiones_conductor[payload.conductor_token]
+                log.info(
+                    f"Sesión de conductor {payload.conductor_token[:8]}... finalizada"
+                )
+
+                # Broadcast a todos los clientes WebSocket
+                flota_actual = _get_flota_data_completa()
+                await manager.broadcast({"tipo": "flota", "datos": flota_actual})
+            else:
+                log.info(
+                    f"Intento de finalizar sesión de conductor inexistente: "
+                    f"{payload.conductor_token[:8]}... (idempotente)"
+                )
+
+        return {"estado": "ok", "mensaje": "sesión finalizada"}
+    except Exception as e:
+        log.error(f"Error al finalizar sesión de conductor: {e}")
+        # Idempotente: siempre devolvemos OK
+        return {"estado": "ok", "mensaje": "sesión finalizada"}
 
 
 @app.post("/api/gps-conductor")
@@ -867,19 +1132,22 @@ async def contribuir_ubicacion(payload: UbicacionUsuario):
     if payload.precision_m is not None and payload.precision_m > 50:
         return {"estado": "rechazado", "motivo": "precisión GPS insuficiente"}
 
-    # Map matching: verificar que está en zona de ruta válida
-    map_result = map_matching(payload.lat, payload.lon, payload.velocidad_ms, payload.precision_m)
-    if map_result is None:
-        return {
-            "estado":  "ignorado",
-            "motivo":  "ubicación fuera de ruta o velocidad incompatible con bus",
-            "lat":     payload.lat,
-            "lon":     payload.lon,
-            "vel_ms":  payload.velocidad_ms,
-        }
-
     # Determinar si es conductor o pasajero
     es_conductor = payload.conductor_token is not None
+
+    # Map matching: solo para pasajeros (el conductor es el bus)
+    if not es_conductor:
+        map_result = map_matching(payload.lat, payload.lon, payload.velocidad_ms, payload.precision_m)
+        if map_result is None:
+            return {
+                "estado":  "ignorado",
+                "motivo":  "ubicación fuera de ruta o velocidad incompatible con bus",
+                "lat":     payload.lat,
+                "lon":     payload.lon,
+                "vel_ms":  payload.velocidad_ms,
+            }
+    else:
+        map_result = {"indice_ruta": 0}
 
     if es_conductor:
         # Modo conductor - buscar o crear sesión de conductor

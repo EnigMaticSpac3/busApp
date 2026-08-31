@@ -1,14 +1,17 @@
+import os
 import xml.etree.ElementTree as ET
 import psycopg2
+from dotenv import load_dotenv
+
+load_dotenv()
 
 try:
-    # Conexión ajustada a tus credenciales de Docker
     conn = psycopg2.connect(
-        host="db",
-        database="san_antonio_db",
-        user="admin",
-        password="password123",
-        port="5432"
+        host=os.getenv("DB_HOST", "db"),
+        database=os.getenv("DB_NAME", "san_antonio_db"),
+        user=os.getenv("DB_USER", "admin"),
+        password=os.getenv("DB_PASSWORD", "changeme"),
+        port=os.getenv("DB_PORT", "5432"),
     )
     cur = conn.cursor()
 

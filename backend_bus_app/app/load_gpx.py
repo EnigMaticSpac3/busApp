@@ -1,6 +1,9 @@
 import gpxpy
 import psycopg2
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def load_gpx():
     ruta_archivo = 'data/version_2.gpx'
@@ -13,11 +16,11 @@ def load_gpx():
     try:
         # Nos conectamos usando el nombre del servicio de docker-compose ('db')
         conn = psycopg2.connect(
-            dbname="san_antonio_db",
-            user="admin",
-            password="password123",
-            host="db", 
-            port="5432"
+            dbname=os.getenv("DB_NAME", "san_antonio_db"),
+            user=os.getenv("DB_USER", "admin"),
+            password=os.getenv("DB_PASSWORD", "changeme"),
+            host=os.getenv("DB_HOST", "db"),
+            port=os.getenv("DB_PORT", "5432"),
         )
         cur = conn.cursor()
 

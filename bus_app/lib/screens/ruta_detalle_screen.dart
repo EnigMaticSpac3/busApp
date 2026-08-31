@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:bus_app/theme/export.dart';
 import 'package:bus_app/widgets/route_badge.dart';
+import 'package:bus_app/widgets/stop_marker.dart';
 import '../models/bus_sesion_model.dart';
 import '../models/parada_model.dart';
 import '../models/ruta_model.dart';
@@ -186,7 +187,7 @@ class _RutaDetalleScreenState extends State<RutaDetalleScreen> {
                   point: LatLng(parada.lat, parada.lon),
                   width: 32,
                   height: 32,
-                  child: _StopMarker(orden: parada.orden),
+                  child: StopMarker(orden: parada.orden, size: 32, showNumber: true),
                 )),
               ],
             ),
@@ -323,32 +324,6 @@ class _RutaDetalleScreenState extends State<RutaDetalleScreen> {
           indent: 52,
         ),
       ],
-    );
-  }
-}
-
-class _StopMarker extends StatelessWidget {
-  final int orden;
-  const _StopMarker({required this.orden});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        shape: BoxShape.circle,
-        boxShadow: [AppShadows.shadowSm],
-      ),
-      child: Center(
-        child: Text(
-          '$orden',
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: AppColors.white,
-          ),
-        ),
-      ),
     );
   }
 }

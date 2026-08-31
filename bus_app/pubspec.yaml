@@ -35,6 +35,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   flutter_map: ^8.3.0
+  flutter_map_vector_tiles: ^0.1.0
   latlong2: ^0.9.1
   gpx: ^2.3.0
   http: ^1.6.0
@@ -43,6 +44,7 @@ dependencies:
   web_socket_channel: ^2.4.0
   google_fonts: ^6.2.1
   flutter_dotenv: ^5.2.1
+  provider: ^6.1.2
 
 
 dev_dependencies:

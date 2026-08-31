@@ -2,15 +2,15 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'theme/export.dart';
+import 'package:provider/provider.dart';
+import 'theme/living_theme.dart';
+import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/conductor_login_screen.dart';
 import 'screens/conductor_screen.dart';
 
 void main() async {
   // Cargar variables desde .env (BACKEND_URL, etc.)
-  // El archivo .env está en bus_app/.env y listado en assets de pubspec.yaml.
-  // Si no existe, se usa el fallback en AppConfig.backendUrl.
   await dotenv.load(fileName: '.env');
   runApp(const BusApp());
 }
@@ -20,23 +20,26 @@ class BusApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'San Antonio Bus Tracker',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const HomeScreen(),
-        '/conductor-login': (context) => const ConductorLoginScreen(),
-        '/conductor': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-          return ConductorScreen(
-            conductorToken: args?['conductorToken'] ?? '',
-            nombreConductor: args?['nombreConductor'] ?? '',
-            rutaAsignada: args?['rutaAsignada'] ?? '',
-          );
+    return ChangeNotifierProvider(
+      create: (_) => LivingTheme(),
+      child: MaterialApp(
+        title: 'Transita',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        initialRoute: '/',
+        routes: {
+          '/': (context) => const HomeScreen(),
+          '/conductor-login': (context) => const ConductorLoginScreen(),
+          '/conductor': (context) {
+            final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+            return ConductorScreen(
+              conductorToken: args?['conductorToken'] ?? '',
+              nombreConductor: args?['nombreConductor'] ?? '',
+              rutaAsignada: args?['rutaAsignada'] ?? '',
+            );
+          },
         },
-      },
+      ),
     );
   }
 }
