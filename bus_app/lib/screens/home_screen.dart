@@ -17,6 +17,7 @@ import '../widgets/bus_marker_widget.dart';
 import '../widgets/canal_vector_map.dart';
 import '../widgets/contribuir_fab.dart';
 
+import '../widgets/connection_banner.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_banner.dart';
 import '../widgets/route_badge.dart';
@@ -76,6 +77,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // ── Brújula ──
   double _mapRotation = 0;
 
+  // ── Conexión ──
+  bool _isOffline = false;
+
   // ── Lifecycle ──
 
   @override
@@ -127,7 +131,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onWsChange() {
     if (mounted) {
-      setState(() => _flota = _wsService!.flota);
+      setState(() {
+        _flota = _wsService!.flota;
+        _isOffline = !(_wsService?.conectado ?? false);
+      });
     }
   }
 
@@ -423,6 +430,22 @@ class _HomeScreenState extends State<HomeScreen> {
               top: padding.top + AppSpacing.md,
               right: AppSpacing.lg,
               child: _buildCompassButton(isDark),
+            ),
+
+          // ═══ Banner offline ═══
+          if (_isOffline)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: ConnectionBanner(
+                lastUpdated: 'hace un momento',
+                isDark: isDark,
+                onRetry: () {
+                  _iniciarWebSocket();
+                  setState(() => _isOffline = false);
+                },
+              ),
             ),
 
           // ═══ Banner de error crowdsourcing ═══
