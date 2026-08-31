@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:bus_app/theme/export.dart';
 import '../services/auth_service.dart';
 
@@ -11,7 +12,7 @@ class ConductorLoginScreen extends StatefulWidget {
 }
 
 class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
-  final _authService = AuthService();
+  late final AuthService _authService;
   final _pinController = TextEditingController();
   bool _isLoading = false;
   String? _error;
@@ -21,6 +22,12 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
   void initState() {
     super.initState();
     _pinController.addListener(_onPinChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _authService = context.read<AuthService>();
   }
 
   @override

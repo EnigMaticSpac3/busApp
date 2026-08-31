@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
 import 'package:bus_app/theme/export.dart';
 import 'package:bus_app/widgets/route_badge.dart';
 import 'package:bus_app/widgets/stop_marker.dart';
@@ -21,7 +22,7 @@ class RutaDetalleScreen extends StatefulWidget {
 }
 
 class _RutaDetalleScreenState extends State<RutaDetalleScreen> {
-  final _api = ApiService();
+  late final ApiService _api;
   final _mapController = MapController();
   List<ParadaModel> _paradas = [];
   List<BusSesion> _flota = [];
@@ -36,6 +37,12 @@ class _RutaDetalleScreenState extends State<RutaDetalleScreen> {
     _cargarParadas();
     _cargarFlota();
     _iniciarPolling();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _api = context.read<ApiService>();
   }
 
   @override

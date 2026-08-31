@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:bus_app/theme/export.dart';
 import 'package:bus_app/widgets/route_badge.dart';
 import 'package:bus_app/widgets/empty_state.dart';
@@ -18,7 +19,7 @@ class RutasScreen extends StatefulWidget {
 }
 
 class _RutasScreenState extends State<RutasScreen> {
-  final _api = ApiService();
+  late final ApiService _api;
   List<RutaModel> _rutas = [];
   List<BusSesion> _flota = [];
   bool _cargando = true;
@@ -39,6 +40,12 @@ class _RutasScreenState extends State<RutasScreen> {
       (_) => _cargarFlota(),
     );
     _cargarFlota();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _api = context.read<ApiService>();
   }
 
   @override

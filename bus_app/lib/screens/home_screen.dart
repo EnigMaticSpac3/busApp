@@ -42,11 +42,12 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // ── Servicios ──
-  final _api = ApiService();
-  final _crowdsourcing = CrowdsourcingService();
+  // ── Servicios (via Provider) ──
+  late final ApiService _api;
+  late final CrowdsourcingService _crowdsourcing;
   final _mapController = MapController();
   WebSocketService? _wsService;
+  bool _initialized = false;
 
   // ── Estado del mapa ──
   List<LatLng> _routePoints = [];
@@ -85,18 +86,30 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _crowdsourcing.addListener(_onCrowdsourcingChange);
-    _wsService = WebSocketService();
-    _wsService!.addListener(_onWsChange);
+    // Services are read from Provider in didChangeDependencies
     _sheetController.addListener(_onSheetChanged);
+  }
 
-    _iniciarWebSocket();
-    _cargarRuta();
-    _iniciarPolling();
-    _iniciarUbicacion();
-    _cargarRutas();
-    _mostrarSheetSiCorresponde();
-    _loadEmptyBannerPreference();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Initialize services from Provider on first build
+    if (!_initialized) {
+      _initialized = true;
+      _api = context.read<ApiService>();
+      _crowdsourcing = context.read<CrowdsourcingService>();
+      _wsService = context.read<WebSocketService>();
+      _wsService!.addListener(_onWsChange);
+      _crowdsourcing.addListener(_onCrowdsourcingChange);
+
+      _iniciarWebSocket();
+      _cargarRuta();
+      _iniciarPolling();
+      _iniciarUbicacion();
+      _cargarRutas();
+      _mostrarSheetSiCorresponde();
+      _loadEmptyBannerPreference();
+    }
   }
 
   @override

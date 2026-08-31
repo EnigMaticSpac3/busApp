@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
 
 import '../services/api_service.dart';
 import '../models/eta_parada_response.dart';
@@ -35,7 +36,7 @@ class StopDetailScreen extends StatefulWidget {
 }
 
 class _StopDetailScreenState extends State<StopDetailScreen> {
-  final ApiService _api = ApiService();
+  late final ApiService _api;
 
   bool _loading = true;
   bool _offline = false;
@@ -47,6 +48,12 @@ class _StopDetailScreenState extends State<StopDetailScreen> {
   void initState() {
     super.initState();
     _cargarEta();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _api = context.read<ApiService>();
   }
 
   // ── Carga de datos ──────────────────────────────────────────────
