@@ -26,6 +26,7 @@ import '../widgets/stop_marker.dart';
 import '../widgets/subida_bus_sheet.dart';
 import '../widgets/user_location_marker.dart';
 import '../theme/export.dart';
+import 'profile_screen.dart';
 import 'ruta_detalle_screen.dart';
 
 /// HomeScreen con patrón Citymapper: mapa vectorial a pantalla completa
@@ -785,59 +786,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Tab Perfil: placeholder funcional ──
+  // ── Tab Perfil: pantalla completa con ajustes y conductor ──
 
   Widget _buildPerfilTabContent(bool isDark) {
-    final textColor = isDark
-        ? CanalColors.darkTextPrimary
-        : CanalColors.lightTextPrimary;
-    final secondaryColor = isDark
-        ? CanalColors.darkTextSecondary
-        : CanalColors.lightTextSecondary;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.md,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Perfil',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: textColor,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.person, color: secondaryColor),
-            title: const Text('Invitado'),
-            subtitle: Text(
-              'Inicia sesión para contribuir',
-              style: TextStyle(color: secondaryColor),
-            ),
-          ),
-          const Divider(),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.admin_panel_settings),
-            title: const Text('Acceso Conductor'),
-            onTap: () =>
-                Navigator.pushNamed(context, '/conductor-login'),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.info_outline),
-            title: const Text('Acerca de'),
-            onTap: () {},
-          ),
-        ],
-      ),
-    );
+    return const ProfileScreen();
   }
 
   // ──────────────────────────────────────────────────────────────
