@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:bus_app/theme/export.dart';
-import 'package:bus_app/widgets/route_badge.dart';
-import 'package:bus_app/widgets/stop_header.dart';
+import 'package:bus_app/theme/canal_colors.dart';
+import 'package:bus_app/widgets/eta_card.dart';
 
-class EtaCard {
+/// Data class for ETA information in the stop detail sheet.
+/// Renamed from EtaCard to avoid conflict with the ETACard widget.
+class StopEtaCard {
   final String rutaCodigo;
   final String destino;
   final String eta;
   final int minutos;
 
-  const EtaCard({
+  const StopEtaCard({
     required this.rutaCodigo,
     required this.destino,
     required this.eta,
@@ -20,7 +21,7 @@ class EtaCard {
 class StopDetailSheet extends StatelessWidget {
   final String paradaNombre;
   final String paradaId;
-  final List<EtaCard> etas;
+  final List<StopEtaCard> etas;
   final VoidCallback? onFavorito;
 
   const StopDetailSheet({
@@ -35,14 +36,14 @@ class StopDetailSheet extends StatelessWidget {
     BuildContext context, {
     required String paradaNombre,
     required String paradaId,
-    required List<EtaCard> etas,
+    required List<StopEtaCard> etas,
   }) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       elevation: 4,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.large)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (_) => StopDetailSheet(
         paradaNombre: paradaNombre,
@@ -55,148 +56,122 @@ class StopDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
-      padding: EdgeInsets.fromLTRB(AppSpacing.xxl, AppSpacing.md, AppSpacing.xxl, AppSpacing.lg + bottomPadding),
+      padding: EdgeInsets.fromLTRB(20, 10, 20, 20 + bottomPadding),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Handle
           Center(
             child: Container(
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.gray300,
-                borderRadius: BorderRadius.circular(2),
+                color: isDark ? CanalColors.darkTextMuted : CanalColors.lightBorder,
+                borderRadius: BorderRadius.circular(4),
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.xl),
-          StopHeader(
-            titulo: paradaNombre,
-            subtitulo: 'Parada • $paradaId',
-            trailing: IconButton(
-              icon: Icon(Icons.star_border, color: AppColors.textSecondary),
-              onPressed: onFavorito,
-            ),
+          const SizedBox(height: 16),
+
+          // Stop header
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: CanalColors.primary.withValues(alpha: isDark ? 0.18 : 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: CanalColors.primary.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.location_on_rounded,
+                    size: 18,
+                    color: CanalColors.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      paradaNombre,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: isDark
+                            ? CanalColors.darkTextPrimary
+                            : CanalColors.lightTextPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Parada • $paradaId',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? CanalColors.darkTextSecondary
+                            : CanalColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.star_border,
+                  color: isDark ? CanalColors.darkTextMuted : CanalColors.lightTextMuted,
+                ),
+                onPressed: onFavorito,
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: 16),
+
+          // ETA cards using Transita V2 ETACard widget
           if (etas.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+              padding: const EdgeInsets.symmetric(vertical: 24),
               child: Center(
                 child: Text(
                   'No hay buses en camino',
-                  style: AppTypography.textTheme.bodyMedium,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: isDark
+                        ? CanalColors.darkTextSecondary
+                        : CanalColors.lightTextSecondary,
+                  ),
                 ),
               ),
             )
           else
-            ...etas.map(_buildEtaCard),
+            ...etas.map((eta) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: ETACard(
+                    routeCode: eta.rutaCodigo,
+                    destination: eta.destino,
+                    via: eta.rutaCodigo,
+                    eta: eta.minutos,
+                    isLive: true,
+                    variant: 'compact',
+                    isDark: isDark,
+                    onTap: () {
+                      // TODO: navigate to route detail
+                    },
+                  ),
+                )),
         ],
       ),
     );
   }
-
-  Widget _buildEtaCard(EtaCard eta) {
-    final bgColor = _etaBgColor(eta.minutos);
-    final etaColor = _etaTextColor(eta.minutos);
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 0),
-          child: Container(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(AppRadius.medium),
-              boxShadow: [AppShadows.shadowSm],
-            ),
-            child: Row(
-              children: [
-                RouteBadge(codigo: eta.rutaCodigo),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        eta.destino,
-                        style: AppTypography.textTheme.titleMedium,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Row(
-                        children: [
-                          Icon(Icons.directions_bus, size: 12, color: AppColors.textSecondary),
-                          const SizedBox(width: 4),
-                          Text(
-                            'En tiempo real',
-                            style: AppTypography.textTheme.labelMedium,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                if (eta.minutos <= 1)
-                  Text(
-                    'Llegando',
-                    style: AppTypography.textTheme.displayLarge?.copyWith(
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold,
-                      color: etaColor,
-                    ),
-                  )
-                else
-                  Text.rich(
-                    TextSpan(
-                      text: '${eta.minutos}',
-                      style: AppTypography.textTheme.displayLarge?.copyWith(
-                        fontSize: 30,
-                        fontWeight: FontWeight.bold,
-                        color: etaColor,
-                      ),
-                      children: [
-                        TextSpan(
-                          text: "'",
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: etaColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        const Divider(
-          height: AppSpacing.sm,
-          thickness: 0.5,
-          color: AppColors.gray50,
-          indent: 16,
-        ),
-      ],
-    );
-  }
-
-  Color _etaBgColor(int minutos) {
-    if (minutos <= 1) return AppColors.orange50;
-    if (minutos <= 5) return AppColors.orange50;
-    return AppColors.lime50;
-  }
-
-  Color _etaTextColor(int minutos) {
-    if (minutos <= 1) return AppColors.alert;
-    if (minutos <= 5) return AppColors.orange600;
-    return AppColors.accent;
-  }
-
 }
