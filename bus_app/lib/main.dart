@@ -14,6 +14,9 @@ import 'services/websocket_service.dart';
 import 'services/crowdsourcing_service.dart';
 import 'services/conductor_service.dart';
 import 'services/auth_service.dart';
+import 'providers/driver_credentials_provider.dart';
+import 'providers/gamification_provider.dart';
+import 'providers/driver_mode_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/conductor_login_screen.dart';
@@ -47,12 +50,24 @@ class _BusAppState extends State<BusApp> with WidgetsBindingObserver {
   final NotificationsProvider _notificationsProvider = NotificationsProvider();
   final SettingsService _settingsService = SettingsService();
   final OfflineProvider _offlineProvider = OfflineProvider();
+  late final DriverCredentialsProvider _driverCredentialsProvider;
+  late final GamificationProvider _gamificationProvider;
+  late final DriverModeProvider _driverModeProvider;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _updateThemeFromTime();
+
+    // Adapter providers (wrap existing services)
+    _driverCredentialsProvider = DriverCredentialsProvider(_authService);
+    _gamificationProvider = GamificationProvider();
+    _driverModeProvider = DriverModeProvider(_conductorService);
+
+    // Initialize providers that load persisted state
+    _driverCredentialsProvider.init();
+    _gamificationProvider.init();
   }
 
   @override
@@ -92,6 +107,10 @@ class _BusAppState extends State<BusApp> with WidgetsBindingObserver {
         ChangeNotifierProvider<NotificationsProvider>.value(value: _notificationsProvider),
         ChangeNotifierProvider<SettingsService>.value(value: _settingsService),
         ChangeNotifierProvider<OfflineProvider>.value(value: _offlineProvider),
+        // Driver mode adapter providers
+        ChangeNotifierProvider<DriverCredentialsProvider>.value(value: _driverCredentialsProvider),
+        ChangeNotifierProvider<GamificationProvider>.value(value: _gamificationProvider),
+        ChangeNotifierProvider<DriverModeProvider>.value(value: _driverModeProvider),
       ],
       child: ListenableBuilder(
         listenable: _livingTheme,

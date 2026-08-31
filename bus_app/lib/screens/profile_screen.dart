@@ -1,3 +1,14 @@
+// lib/screens/profile_screen.dart
+//
+// Profile screen — full Transita V2 design brought into busApp.
+// All driver stats, badges, credentials dialog, and community card
+// are present. Adapted to use busApp's real services via adapter
+// providers (DriverCredentialsProvider, GamificationProvider,
+// DriverModeProvider).
+//
+// Rewarded ad section is hidden (SizedBox.shrink) since busApp
+// does not have an ad SDK yet.
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/canal_colors.dart';
@@ -6,6 +17,12 @@ import '../theme/favorites_provider.dart';
 import '../theme/notifications_provider.dart';
 import '../theme/settings_service.dart';
 import '../theme/offline_provider.dart';
+import '../providers/driver_credentials_provider.dart';
+import '../providers/gamification_provider.dart';
+import '../providers/driver_mode_provider.dart';
+import '../models/ruta_model.dart';
+import '../screens/ruta_detalle_screen.dart';
+import '../screens/conductor_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -63,6 +80,7 @@ class ProfileScreen extends StatelessWidget {
             _buildSectionHeader('Desarrollo', textMuted),
             _buildOfflineToggle(context, isDark),
             const SizedBox(height: 12),
+            // Rewarded ad demo — hidden until ad SDK is integrated
             const SizedBox.shrink(),
             const SizedBox(height: 24),
             Consumer<FavoritesProvider>(
@@ -155,64 +173,23 @@ class ProfileScreen extends StatelessWidget {
               },
             ),
             const SizedBox(height: 24),
-            _buildSectionHeader('Modo Conductor', textMuted),
-            GestureDetector(
-              onTap: () => Navigator.pushNamed(context, '/conductor-login'),
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: isDark ? CanalColors.darkSurface : CanalColors.lightSurface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isDark ? CanalColors.darkBorder : CanalColors.lightBorder,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: CanalColors.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.directions_bus_rounded,
-                        size: 20,
-                        color: textMuted,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '¿Eres conductor?',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: textPrimary,
-                            ),
-                          ),
-                          Text(
-                            'Activa el modo conductor para contribuir GPS',
-                            style: TextStyle(fontSize: 12, color: textSecondary),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(
-                      Icons.chevron_right,
-                      size: 16,
-                      color: textMuted,
-                    ),
-                  ],
-                ),
-              ),
+            Consumer<DriverCredentialsProvider>(
+              builder: (_, creds, _) {
+                if (creds.isVerified) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionHeader('Modo Conductor', textMuted),
+                      _buildDriverSection(
+                          context, isDark, textPrimary, textSecondary, textMuted),
+                      const SizedBox(height: 24),
+                    ],
+                  );
+                }
+                return _buildDriverPrompt(
+                    context, isDark, textPrimary, textSecondary, textMuted);
+              },
             ),
-            const SizedBox(height: 24),
             _buildSectionHeader('Comunidad', textMuted),
             _buildCommunityCard(
               context,
@@ -226,6 +203,10 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+
+  // ────────────────────────────────────────────────────────────────────
+  // Community card
+  // ────────────────────────────────────────────────────────────────────
 
   Widget _buildCommunityCard(
     BuildContext context,
@@ -465,6 +446,10 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  // ────────────────────────────────────────────────────────────────────
+  // Section headers / sub-headers
+  // ────────────────────────────────────────────────────────────────────
+
   Widget _buildSectionHeader(String label, Color textMuted) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),
@@ -479,6 +464,518 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildSubHeader(String label, Color textMuted) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 6),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: textMuted,
+        ),
+      ),
+    );
+  }
+
+  // ────────────────────────────────────────────────────────────────────
+  // Driver prompt (shown when NOT verified)
+  // ────────────────────────────────────────────────────────────────────
+
+  Widget _buildDriverPrompt(
+    BuildContext context,
+    bool isDark,
+    Color textPrimary,
+    Color textSecondary,
+    Color textMuted,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader('Modo Conductor', textMuted),
+        GestureDetector(
+          onTap: () => _showDriverCredentialsDialog(context, isDark),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: isDark ? CanalColors.darkSurface : CanalColors.lightSurface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark ? CanalColors.darkBorder : CanalColors.lightBorder,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: CanalColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.directions_bus_rounded,
+                    size: 20,
+                    color: textMuted,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '¿Eres conductor?',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: textPrimary,
+                        ),
+                      ),
+                      Text(
+                        'Activa el modo conductor para contribuir GPS',
+                        style: TextStyle(fontSize: 12, color: textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  size: 16,
+                  color: textMuted,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ────────────────────────────────────────────────────────────────────
+  // Driver credentials dialog (uses real AuthService)
+  // ────────────────────────────────────────────────────────────────────
+
+  void _showDriverCredentialsDialog(BuildContext context, bool isDark) {
+    final controller = TextEditingController();
+    String? errorText;
+    bool isLoading = false;
+    final textMuted = isDark
+        ? CanalColors.darkTextMuted
+        : CanalColors.lightTextMuted;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final tp = isDark
+            ? CanalColors.darkTextPrimary
+            : CanalColors.lightTextPrimary;
+        final ts = isDark
+            ? CanalColors.darkTextSecondary
+            : CanalColors.lightTextSecondary;
+
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: isDark
+                  ? CanalColors.darkSurface
+                  : CanalColors.lightSurface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Text(
+                'Modo Conductor',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: tp,
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Ingresa tu PIN de conductor autorizado para activar el modo GPS en tiempo real.',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      height: 1.5,
+                      color: ts,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    keyboardType: TextInputType.number,
+                    maxLength: 4,
+                    obscureText: true,
+                    style: TextStyle(
+                      fontFamily: 'JetBrains Mono',
+                      fontSize: 14,
+                      color: tp,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'PIN de 4 dígitos',
+                      hintStyle: TextStyle(color: textMuted, fontSize: 13),
+                      errorText: errorText,
+                      counterText: '',
+                      filled: true,
+                      fillColor: isDark
+                          ? CanalColors.darkBackground
+                          : CanalColors.lightBackground,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? CanalColors.darkBorder
+                              : CanalColors.lightBorder,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? CanalColors.darkBorder
+                              : CanalColors.lightBorder,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: CanalColors.primary,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(
+                    'Cancelar',
+                    style: TextStyle(color: ts, fontSize: 13),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          final pin = controller.text.trim();
+                          if (pin.length != 4) {
+                            setDialogState(() {
+                              errorText = 'El PIN debe tener 4 dígitos';
+                            });
+                            return;
+                          }
+
+                          setDialogState(() => isLoading = true);
+
+                          final creds =
+                              context.read<DriverCredentialsProvider>();
+                          final success = await creds.verifyCode(pin);
+
+                          if (!ctx.mounted) return;
+
+                          if (success) {
+                            Navigator.of(ctx).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text(
+                                  'Modo conductor activado',
+                                  style: TextStyle(fontFamily: 'Inter'),
+                                ),
+                                backgroundColor: CanalColors.secondary,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          } else {
+                            setDialogState(() {
+                              isLoading = false;
+                              errorText = 'PIN incorrecto';
+                            });
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: CanalColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Activar',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ────────────────────────────────────────────────────────────────────
+  // Driver section (shown when verified)
+  // ────────────────────────────────────────────────────────────────────
+
+  Widget _buildDriverSection(
+    BuildContext context,
+    bool isDark,
+    Color textPrimary,
+    Color textSecondary,
+    Color textMuted,
+  ) {
+    final gamification = context.watch<GamificationProvider>();
+    final driver = context.watch<DriverModeProvider>();
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? CanalColors.darkSurface : CanalColors.lightSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? CanalColors.darkBorder : CanalColors.lightBorder,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with bus icon
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: CanalColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.directions_bus_rounded,
+                  size: 20,
+                  color: CanalColors.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Contribuye GPS en tiempo real',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Comparte tu ubicación y gana puntos',
+                      style: TextStyle(fontSize: 12, color: textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              if (driver.isTracking)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: CanalColors.secondary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: CanalColors.secondary,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'EN VIVO',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: CanalColors.secondary,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Stats row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _DriverStat(
+                value: '${gamification.totalPoints}',
+                label: 'Puntos',
+                color: CanalColors.accent,
+                isDark: isDark,
+              ),
+              _DriverStat(
+                value: '${gamification.tripsCount}',
+                label: 'Viajes',
+                color: CanalColors.primary,
+                isDark: isDark,
+              ),
+              _DriverStat(
+                value: '${gamification.streakDays}',
+                label: 'Racha',
+                color: CanalColors.secondary,
+                isDark: isDark,
+              ),
+              _DriverStat(
+                value: gamification.rankLabel,
+                label: 'Rango',
+                color: CanalColors.accent,
+                isDark: isDark,
+                isText: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Badges
+          if (gamification.earnedBadges.isNotEmpty) ...[
+            Text(
+              'Insignias',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: textMuted,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: gamification.earnedBadges.map((badge) {
+                return Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: CanalColors.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${gamification.badgeIcon(badge)} ${gamification.badgeLabel(badge)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? CanalColors.darkTextPrimary
+                          : CanalColors.lightTextPrimary,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          // Driver mode button
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                final creds = context.read<DriverCredentialsProvider>();
+                final conductor = creds.conductor;
+                if (conductor != null) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ConductorScreen(
+                        conductorToken: conductor.token,
+                        nombreConductor: conductor.nombre,
+                        rutaAsignada: conductor.rutaAsignada,
+                      ),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.play_arrow_rounded, size: 20),
+              label: Text(
+                driver.isTracking
+                    ? 'Ver modo conductor'
+                    : 'Activar modo conductor',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: CanalColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Deactivate driver mode
+          GestureDetector(
+            onTap: () {
+              context.read<DriverCredentialsProvider>().deactivate();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text(
+                    'Modo conductor desactivado',
+                    style: TextStyle(fontFamily: 'Inter'),
+                  ),
+                  backgroundColor: CanalColors.lightTextMuted,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            child: Text(
+              'Desactivar modo conductor',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark
+                    ? CanalColors.darkTextMuted
+                    : CanalColors.lightTextMuted,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ────────────────────────────────────────────────────────────────────
+  // Search alignment setting
+  // ────────────────────────────────────────────────────────────────────
 
   Widget _buildSearchAlignmentSetting(BuildContext context, bool isDark) {
     final settings = context.watch<SettingsService>();
@@ -558,15 +1055,15 @@ class ProfileScreen extends StatelessWidget {
                       color: isSelected
                           ? CanalColors.primary.withValues(alpha: 0.12)
                           : (isDark
-                                ? CanalColors.darkBackground
-                                : CanalColors.lightBackground),
+                              ? CanalColors.darkBackground
+                              : CanalColors.lightBackground),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isSelected
                             ? CanalColors.primary
                             : (isDark
-                                  ? CanalColors.darkBorder
-                                  : CanalColors.lightBorder),
+                                ? CanalColors.darkBorder
+                                : CanalColors.lightBorder),
                         width: isSelected ? 1.5 : 1,
                       ),
                     ),
@@ -575,8 +1072,10 @@ class ProfileScreen extends StatelessWidget {
                         label,
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                          color: isSelected ? CanalColors.primary : textSecondary,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w500,
+                          color:
+                              isSelected ? CanalColors.primary : textSecondary,
                         ),
                       ),
                     ),
@@ -589,6 +1088,10 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+
+  // ────────────────────────────────────────────────────────────────────
+  // Offline toggle
+  // ────────────────────────────────────────────────────────────────────
 
   Widget _buildOfflineToggle(BuildContext context, bool isDark) {
     final offline = context.watch<OfflineProvider>();
@@ -637,7 +1140,9 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  offline.offline ? 'Demo: mostrando datos offline' : 'Demo: datos en vivo',
+                  offline.offline
+                      ? 'Demo: mostrando datos offline'
+                      : 'Demo: datos en vivo',
                   style: TextStyle(fontSize: 12, color: textSecondary),
                 ),
               ],
@@ -653,19 +1158,9 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSubHeader(String label, Color textMuted) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 6),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: textMuted,
-        ),
-      ),
-    );
-  }
+  // ────────────────────────────────────────────────────────────────────
+  // Theme toggle
+  // ────────────────────────────────────────────────────────────────────
 
   Widget _buildThemeToggle(BuildContext context, bool isDark) {
     final livingTheme = context.watch<LivingTheme>();
@@ -734,6 +1229,10 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  // ────────────────────────────────────────────────────────────────────
+  // Citymapper toggle (informational only)
+  // ────────────────────────────────────────────────────────────────────
+
   Widget _buildCitymapperToggle(BuildContext context, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -797,6 +1296,10 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  // ────────────────────────────────────────────────────────────────────
+  // Info tile
+  // ────────────────────────────────────────────────────────────────────
+
   Widget _buildInfoTile(
     String label,
     String value,
@@ -818,9 +1321,94 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  // ────────────────────────────────────────────────────────────────────
+  // Favorite route item (tappable → RutaDetalleScreen)
+  // ────────────────────────────────────────────────────────────────────
+
   Widget _buildFavRouteItem(BuildContext context, String code, bool isDark) {
     return Material(
       color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => RutaDetalleScreen(
+                ruta: RutaModel(
+                  rutaId: code,
+                  codigo: code,
+                  nombre: code,
+                  color: '283C90',
+                  busesActivos: 0,
+                ),
+              ),
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.only(bottom: 6),
+          decoration: BoxDecoration(
+            color: isDark ? CanalColors.darkSurface : CanalColors.lightSurface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark ? CanalColors.darkBorder : CanalColors.lightBorder,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: CanalColors.primary,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  code,
+                  style: const TextStyle(
+                    fontFamily: 'JetBrains Mono',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                Icons.chevron_right,
+                size: 16,
+                color: isDark
+                    ? CanalColors.darkTextMuted
+                    : CanalColors.lightTextMuted,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ────────────────────────────────────────────────────────────────────
+  // Favorite stop item
+  // ────────────────────────────────────────────────────────────────────
+
+  Widget _buildFavStopItem(BuildContext context, String name, bool isDark) {
+    return GestureDetector(
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Selecciona "$name" en el mapa para ver detalles',
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: CanalColors.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      },
       child: Container(
         padding: const EdgeInsets.all(12),
         margin: const EdgeInsets.only(bottom: 6),
@@ -833,23 +1421,23 @@ class ProfileScreen extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: CanalColors.primary,
-                borderRadius: BorderRadius.circular(8),
-              ),
+            Icon(
+              Icons.location_on_rounded,
+              size: 16,
+              color: CanalColors.primary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
               child: Text(
-                code,
-                style: const TextStyle(
-                  fontFamily: 'JetBrains Mono',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
+                name,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark
+                      ? CanalColors.darkTextPrimary
+                      : CanalColors.lightTextPrimary,
                 ),
               ),
             ),
-            const Spacer(),
             Icon(
               Icons.chevron_right,
               size: 16,
@@ -863,47 +1451,9 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFavStopItem(BuildContext context, String name, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.only(bottom: 6),
-      decoration: BoxDecoration(
-        color: isDark ? CanalColors.darkSurface : CanalColors.lightSurface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? CanalColors.darkBorder : CanalColors.lightBorder,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.location_on_rounded,
-            size: 16,
-            color: CanalColors.primary,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              name,
-              style: TextStyle(
-                fontSize: 14,
-                color: isDark
-                    ? CanalColors.darkTextPrimary
-                    : CanalColors.lightTextPrimary,
-              ),
-            ),
-          ),
-          Icon(
-            Icons.chevron_right,
-            size: 16,
-            color: isDark
-                ? CanalColors.darkTextMuted
-                : CanalColors.lightTextMuted,
-          ),
-        ],
-      ),
-    );
-  }
+  // ────────────────────────────────────────────────────────────────────
+  // Notification item
+  // ────────────────────────────────────────────────────────────────────
 
   Widget _buildNotificationItem(
     NotificationItem item,
@@ -916,8 +1466,8 @@ class ProfileScreen extends StatelessWidget {
     final iconColor = item.type == 'disruption'
         ? CanalColors.error
         : (item.type == 'arrival'
-              ? CanalColors.secondary
-              : CanalColors.primary);
+            ? CanalColors.secondary
+            : CanalColors.primary);
 
     return GestureDetector(
       onTap: () => notifs.markAsRead(item.id),
@@ -928,8 +1478,8 @@ class ProfileScreen extends StatelessWidget {
           color: item.read
               ? (isDark ? CanalColors.darkSurface : CanalColors.lightSurface)
               : (isDark
-                    ? CanalColors.darkSurface
-                    : CanalColors.lightBackground),
+                  ? CanalColors.darkSurface
+                  : CanalColors.lightBackground),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isDark ? CanalColors.darkBorder : CanalColors.lightBorder,
@@ -962,7 +1512,8 @@ class ProfileScreen extends StatelessWidget {
                     item.title,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: item.read ? FontWeight.w500 : FontWeight.w600,
+                      fontWeight:
+                          item.read ? FontWeight.w500 : FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
@@ -990,5 +1541,67 @@ class ProfileScreen extends StatelessWidget {
     if (diff.inMinutes < 1) return 'Ahora';
     if (diff.inMinutes < 60) return '${diff.inMinutes}m';
     return '${diff.inHours}h';
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Driver stat widget (used in the driver section stats row)
+// ──────────────────────────────────────────────────────────────────────
+
+class _DriverStat extends StatelessWidget {
+  const _DriverStat({
+    required this.value,
+    required this.label,
+    required this.color,
+    required this.isDark,
+    this.isText = false,
+  });
+
+  final String value;
+  final String label;
+  final Color color;
+  final bool isDark;
+  final bool isText;
+
+  @override
+  Widget build(BuildContext context) {
+    final textPrimary = isDark
+        ? CanalColors.darkTextPrimary
+        : CanalColors.lightTextPrimary;
+
+    return Column(
+      children: [
+        isText
+            ? Text(
+                value,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              )
+            : Text(
+                value,
+                style: TextStyle(
+                  fontFamily: 'JetBrains Mono',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: textPrimary,
+                ),
+              ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 11,
+            color: isDark
+                ? CanalColors.darkTextSecondary
+                : CanalColors.lightTextSecondary,
+          ),
+        ),
+      ],
+    );
   }
 }
