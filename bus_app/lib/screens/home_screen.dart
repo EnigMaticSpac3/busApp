@@ -31,8 +31,8 @@ import 'profile_screen.dart';
 import 'ruta_detalle_screen.dart';
 
 /// HomeScreen con patrón Citymapper: mapa vectorial a pantalla completa
-/// como fondo, DraggableScrollableSheet con contenido contextual por tab,
-/// BottomNavigationBar fijo, FAB de reubicación con opacidad animada,
+/// como fondo, DraggableScrollableSheet con contenido contextual y acciones
+/// integradas en el panel, FAB de reubicación con opacidad animada,
 /// y brújula visible al rotar el mapa.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -73,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // ── Navegación y sheet ──
   int _selectedTab = 0;
   final _sheetController = DraggableScrollableController();
-  double _sheetExtent = 0.18;
+  double _sheetExtent = 0.26;
 
   // ── Brújula ──
   double _mapRotation = 0;
@@ -132,7 +132,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     final height = MediaQuery.of(context).size.height;
     if (height <= 0) return;
-    final extent = _sheetController.size / height;
+    // DraggableScrollableController.size is already a fraction of the
+    // viewport. Dividing it by the viewport height made the sheet state
+    // effectively zero and put floating controls in the wrong place.
+    final extent = _sheetController.size;
     if ((extent - _sheetExtent).abs() > 0.005) {
       setState(() => _sheetExtent = extent);
     }
@@ -169,18 +172,19 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (permiso == LocationPermission.deniedForever) return;
 
-    _locationSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 5,
-      ),
-    ).listen((Position posicion) {
-      if (mounted) {
-        setState(() {
-          _posicionUsuario = LatLng(posicion.latitude, posicion.longitude);
+    _locationSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 5,
+          ),
+        ).listen((Position posicion) {
+          if (mounted) {
+            setState(() {
+              _posicionUsuario = LatLng(posicion.latitude, posicion.longitude);
+            });
+          }
         });
-      }
-    });
   }
 
   // ── Crowdsourcing ──
@@ -297,7 +301,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _centrarEn(double lat, double lon, {double zoom = 16.0}) {
     _mapController.move(LatLng(lat, lon), zoom);
     _sheetController.animateTo(
-      0.06,
+      0.20,
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
     );
@@ -325,48 +329,116 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       paradaNombre: parada.nombre,
       paradaId: parada.paradaId,
-      etas: response?.buses
-              .map((b) => StopEtaCard(
-                    rutaCodigo: b.rutaCodigo,
-                    destino: b.rutaId,
-                    eta: b.eta,
-                    minutos: _parseMinutos(b.eta),
-                  ))
+      etas:
+          response?.buses
+              .map(
+                (b) => StopEtaCard(
+                  rutaCodigo: b.rutaCodigo,
+                  destino: b.rutaId,
+                  eta: b.eta,
+                  minutos: _parseMinutos(b.eta),
+                ),
+              )
               .toList() ??
           [],
     );
+  }
+
+  void _abrirBusqueda() {
+    final controller = TextEditingController();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final query = controller.text.trim().toLowerCase();
+            final paradas = _paradas
+                .where((p) => p.nombre.toLowerCase().contains(query))
+                .toList();
+            final rutas = _rutas
+                .where(
+                  (r) =>
+                      '${r.codigo} ${r.nombre}'.toLowerCase().contains(query),
+                )
+                .toList();
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  0,
+                  AppSpacing.lg,
+                  MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: controller,
+                      autofocus: true,
+                      onChanged: (_) => setSheetState(() {}),
+                      decoration: const InputDecoration(
+                        labelText: 'Buscar parada o ruta',
+                        prefixIcon: Icon(Icons.search_rounded),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    SizedBox(
+                      height: 280,
+                      child: ListView(
+                        children: [
+                          ...paradas.map(
+                            (parada) => ListTile(
+                              leading: const Icon(Icons.location_on_outlined),
+                              title: Text(parada.nombre),
+                              onTap: () {
+                                Navigator.pop(sheetContext);
+                                _centrarEn(parada.lat, parada.lon);
+                              },
+                            ),
+                          ),
+                          ...rutas.map(
+                            (ruta) => ListTile(
+                              leading: const Icon(
+                                Icons.directions_bus_outlined,
+                              ),
+                              title: Text(ruta.nombre),
+                              subtitle: Text(ruta.codigo),
+                              onTap: () {
+                                Navigator.pop(sheetContext);
+                                setState(() => _selectedTab = 1);
+                                _sheetController.animateTo(
+                                  0.45,
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeOut,
+                                );
+                              },
+                            ),
+                          ),
+                          if (paradas.isEmpty && rutas.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.all(AppSpacing.lg),
+                              child: Text('No encontramos resultados'),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(controller.dispose);
   }
 
   int _parseMinutos(String eta) {
     final match = RegExp(r'(\d+)\s*min').firstMatch(eta);
     if (match != null) return int.parse(match.group(1)!);
     return eta.contains('Menos de 1 min') ? 0 : 999;
-  }
-
-  // ── Navegación de tabs ──
-
-  void _onTabChanged(int index) {
-    setState(() => _selectedTab = index);
-    switch (index) {
-      case 0: // Mapa — colapsar al peek
-        _sheetController.animateTo(
-          0.06,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      case 1: // Rutas — expandir a la mitad
-        _sheetController.animateTo(
-          0.45,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      case 2: // Perfil — expandir a la mitad
-        _sheetController.animateTo(
-          0.40,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-    }
   }
 
   // ──────────────────────────────────────────────────────────────
@@ -377,8 +449,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final livingTheme = context.watch<LivingTheme>();
     final isDark = livingTheme.isDark;
-    final padding = MediaQuery.of(context).padding;
-    final navBarHeight = kBottomNavigationBarHeight + padding.bottom;
+    final sheetBottom = MediaQuery.of(context).size.height * _sheetExtent;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -387,60 +458,33 @@ class _HomeScreenState extends State<HomeScreen> {
           // ═══ Capa base: mapa vectorial a pantalla completa ═══
           Positioned.fill(child: _buildMap(isDark)),
 
-          // ═══ SearchPill flotante sobre el mapa ═══
-          Positioned(
-            top: padding.top + AppSpacing.md,
-            left: AppSpacing.lg,
-            right: AppSpacing.lg,
-            child: SearchPill(
-              label: '¿A dónde vas?',
-              isDark: isDark,
-              onTap: () {
-                // TODO: open search flow
-              },
-              onFilter: () {
-                // TODO: open filters
-              },
-            ),
-          ),
-
-          // ═══ Sheet deslizante (sobre el mapa, debajo de la nav) ═══
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 0,
-            bottom: navBarHeight,
+          // ═══ Sheet deslizante con búsqueda y navegación contextual ═══
+          Align(
+            alignment: Alignment.bottomCenter,
             child: DraggableScrollableSheet(
               controller: _sheetController,
-              initialChildSize: 0.18,
-              minChildSize: 0.06,
-              maxChildSize: 1.0,
+              initialChildSize: 0.26,
+              minChildSize: 0.20,
+              maxChildSize: 0.88,
+              expand: false,
               snap: true,
-              snapSizes: const [0.06, 0.40, 0.75],
+              snapSizes: const [0.26, 0.45, 0.75],
               builder: (context, scrollController) =>
                   _buildSheetPanel(scrollController, isDark),
             ),
           ),
 
-          // ═══ Bottom NavigationBar fijo ═══
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: _buildBottomNav(isDark),
-          ),
-
-          // ═══ FABs flotantes (derecha, sobre la nav) ═══
+          // ═══ FABs flotantes (derecha, sobre el panel) ═══
           Positioned(
             right: AppSpacing.lg,
-            bottom: navBarHeight + AppSpacing.lg,
+            bottom: sheetBottom + AppSpacing.md,
             child: _buildFABs(isDark),
           ),
 
           // ═══ Brújula (se muestra al rotar) ═══
           if (_mapRotation.abs() > 5)
             Positioned(
-              top: padding.top + AppSpacing.md,
+              bottom: sheetBottom + AppSpacing.lg + 48,
               right: AppSpacing.lg,
               child: _buildCompassButton(isDark),
             ),
@@ -478,13 +522,15 @@ class _HomeScreenState extends State<HomeScreen> {
               !_emptyBannerDismissed &&
               _sheetExtent < 0.25)
             Positioned(
-              bottom: navBarHeight + AppSpacing.xxl + 60,
+              bottom: sheetBottom + AppSpacing.xxl,
               left: AppSpacing.lg,
               right: AppSpacing.lg,
               child: Material(
                 elevation: 4,
                 borderRadius: BorderRadius.circular(AppRadius.medium),
-                color: isDark ? CanalColors.darkSurface : CanalColors.lightSurface,
+                color: isDark
+                    ? CanalColors.darkSurface
+                    : CanalColors.lightSurface,
                 surfaceTintColor: Colors.transparent,
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.lg),
@@ -511,13 +557,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildMap(bool isDark) {
     return IgnorePointer(
       // El mapa es interactuable solo cuando el sheet está en peek
-      ignoring: _sheetExtent > 0.15,
+      ignoring: _sheetExtent > 0.45,
       child: GestureDetector(
         // Al tocar el mapa, colapsar el sheet
         onTap: () {
           if (_sheetExtent > 0.15) {
             _sheetController.animateTo(
-              0.06,
+              0.20,
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeOut,
             );
@@ -582,14 +628,14 @@ class _HomeScreenState extends State<HomeScreen> {
   // ──────────────────────────────────────────────────────────────
 
   Widget _buildSheetPanel(ScrollController scrollController, bool isDark) {
-    final bgColor =
-        isDark ? CanalColors.darkSurface : CanalColors.lightSurface;
+    final bgColor = isDark ? CanalColors.darkSurface : CanalColors.lightSurface;
 
     return Container(
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(AppRadius.xlarge)),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppRadius.xlarge),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
@@ -598,15 +644,15 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      child: ListView(
-        controller: scrollController,
-        padding: EdgeInsets.zero,
-        physics: const ClampingScrollPhysics(),
+      child: Column(
         children: [
           // ── Handle de arrastre ──
           Center(
             child: Container(
-              margin: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              margin: const EdgeInsets.only(
+                top: AppSpacing.sm,
+                bottom: AppSpacing.xs,
+              ),
               width: 36,
               height: 4,
               decoration: BoxDecoration(
@@ -618,8 +664,18 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // ── Contenido por tab ──
-          _buildTabContent(isDark),
+          // ── Búsqueda y accesos contextuales (patrón Transita V2) ──
+          _buildSheetSearchControls(isDark),
+
+          // ── Contenido contextual ──
+          Expanded(
+            child: ListView(
+              controller: scrollController,
+              padding: EdgeInsets.zero,
+              physics: const ClampingScrollPhysics(),
+              children: [_buildTabContent(isDark)],
+            ),
+          ),
         ],
       ),
     );
@@ -674,7 +730,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: Text(
                     _errorRuta!,
-                    style: const TextStyle(fontSize: 13, color: CanalColors.alert),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: CanalColors.alert,
+                    ),
                   ),
                 ),
                 TextButton(
@@ -682,7 +741,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     setState(() => _errorRuta = null);
                     _cargarRuta();
                   },
-                  child: const Text('Reintentar', style: TextStyle(fontSize: 12)),
+                  child: const Text(
+                    'Reintentar',
+                    style: TextStyle(fontSize: 12),
+                  ),
                 ),
               ],
             )
@@ -709,7 +771,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     'Conectado',
                     style: const TextStyle(
-                        fontSize: 11, color: CanalColors.liveGreen),
+                      fontSize: 11,
+                      color: CanalColors.liveGreen,
+                    ),
                   ),
                 ],
               ),
@@ -762,8 +826,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildRutaCard(RutaModel ruta, bool isDark) {
-    final busesActivos =
-        _flota.where((b) => b.rutaId == ruta.rutaId && b.esActivo).length;
+    final busesActivos = _flota
+        .where((b) => b.rutaId == ruta.rutaId && b.esActivo)
+        .length;
     final tieneBuses = busesActivos > 0;
     final secondaryColor = isDark
         ? CanalColors.darkTextSecondary
@@ -837,37 +902,76 @@ class _HomeScreenState extends State<HomeScreen> {
     return const ProfileScreen();
   }
 
-  // ──────────────────────────────────────────────────────────────
-  // BOTTOM NAVIGATION BAR
-  // ──────────────────────────────────────────────────────────────
+  // Search, routes and profile stay reachable without introducing a second
+  // persistent navigation surface. This mirrors the reference composition:
+  // the pill belongs to the draggable sheet, not to the map's top edge.
+  Widget _buildSheetSearchControls(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.xs,
+        AppSpacing.lg,
+        AppSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: SearchPill(
+              key: const Key('searchPill'),
+              label: '¿A dónde vas?',
+              isDark: isDark,
+              onTap: _abrirBusqueda,
+              onFilter: _abrirBusqueda,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          _buildSheetAction(
+            icon: Icons.directions_bus_outlined,
+            label: 'Rutas',
+            isDark: isDark,
+            onPressed: () {
+              setState(() => _selectedTab = 1);
+              _sheetController.animateTo(
+                0.45,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
+            },
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          _buildSheetAction(
+            icon: Icons.person_outline,
+            label: 'Perfil',
+            isDark: isDark,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-  Widget _buildBottomNav(bool isDark) {
-    return NavigationBar(
-      selectedIndex: _selectedTab,
-      onDestinationSelected: _onTabChanged,
-      backgroundColor:
-          isDark ? CanalColors.darkSurface : CanalColors.lightSurface,
-      surfaceTintColor: Colors.transparent,
-      indicatorColor: CanalColors.primary.withValues(alpha: 0.12),
-      elevation: 0,
-      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      destinations: const [
-        NavigationDestination(
-          icon: Icon(Icons.map_outlined),
-          selectedIcon: Icon(Icons.map),
-          label: 'Mapa',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.directions_bus_outlined),
-          selectedIcon: Icon(Icons.directions_bus),
-          label: 'Rutas',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.person_outline),
-          selectedIcon: Icon(Icons.person),
-          label: 'Perfil',
-        ),
-      ],
+  Widget _buildSheetAction({
+    required IconData icon,
+    required String label,
+    required bool isDark,
+    required VoidCallback onPressed,
+  }) {
+    final color = isDark
+        ? CanalColors.darkTextSecondary
+        : CanalColors.lightTextSecondary;
+    return Semantics(
+      button: true,
+      label: label,
+      child: IconButton(
+        tooltip: label,
+        onPressed: onPressed,
+        constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+        padding: EdgeInsets.zero,
+        icon: Icon(icon, size: 22, color: color),
+      ),
     );
   }
 
@@ -879,7 +983,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final activo = _crowdsourcing.estaActivo;
     final ignorado = _crowdsourcing.estado == EstadoContribucion.ignorado;
     final busId = _crowdsourcing.busAsignado;
-    final fabOpacity = _sheetExtent < 0.25 ? 1.0 : 0.0;
+    final fabOpacity = _sheetExtent < 0.55 ? 1.0 : 0.0;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -890,7 +994,7 @@ class _HomeScreenState extends State<HomeScreen> {
           opacity: fabOpacity,
           duration: const Duration(milliseconds: 200),
           child: IgnorePointer(
-            ignoring: _sheetExtent >= 0.25,
+            ignoring: _sheetExtent >= 0.55,
             child: Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: FloatingActionButton.small(
@@ -914,7 +1018,7 @@ class _HomeScreenState extends State<HomeScreen> {
           opacity: fabOpacity,
           duration: const Duration(milliseconds: 200),
           child: IgnorePointer(
-            ignoring: _sheetExtent >= 0.25,
+            ignoring: _sheetExtent >= 0.55,
             child: ContribuirFab(
               activo: activo,
               busId: busId,
