@@ -12,7 +12,7 @@ import '../models/ruta_model.dart';
 import '../services/api_service.dart';
 import '../services/crowdsourcing_service.dart';
 import '../services/websocket_service.dart';
-import '../widgets/app_search_bar.dart';
+import '../widgets/search_pill.dart';
 import '../widgets/bus_marker_widget.dart';
 import '../widgets/canal_vector_map.dart';
 import '../widgets/contribuir_fab.dart';
@@ -367,12 +367,21 @@ class _HomeScreenState extends State<HomeScreen> {
           // ═══ Capa base: mapa vectorial a pantalla completa ═══
           Positioned.fill(child: _buildMap(isDark)),
 
-          // ═══ Barra de búsqueda flotante ═══
+          // ═══ SearchPill flotante sobre el mapa ═══
           Positioned(
             top: padding.top + AppSpacing.md,
             left: AppSpacing.lg,
             right: AppSpacing.lg,
-            child: const AppSearchBar(),
+            child: SearchPill(
+              label: '¿A dónde vas?',
+              isDark: isDark,
+              onTap: () {
+                // TODO: open search flow
+              },
+              onFilter: () {
+                // TODO: open filters
+              },
+            ),
           ),
 
           // ═══ Sheet deslizante (sobre el mapa, debajo de la nav) ═══
