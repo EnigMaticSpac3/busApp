@@ -14,6 +14,7 @@ from .services.gtfs_service import cargar_gtfs_completo
 from .services.websocket_manager import manager
 from .services.session_store import session_store
 from .routes.api import router
+from .routes.alerts import router as alerts_router
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -134,3 +135,4 @@ app.add_middleware(
 
 # Incluir rutas
 app.include_router(router)
+app.include_router(alerts_router)

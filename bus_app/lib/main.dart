@@ -14,6 +14,7 @@ import 'services/websocket_service.dart';
 import 'services/crowdsourcing_service.dart';
 import 'services/conductor_service.dart';
 import 'services/auth_service.dart';
+import 'services/alert_service.dart';
 import 'providers/driver_credentials_provider.dart';
 import 'providers/gamification_provider.dart';
 import 'providers/driver_mode_provider.dart';
@@ -46,6 +47,7 @@ class _BusAppState extends State<BusApp> with WidgetsBindingObserver {
   final CrowdsourcingService _crowdsourcingService = CrowdsourcingService();
   final ConductorService _conductorService = ConductorService();
   final AuthService _authService = AuthService();
+  final AlertService _alertService = AlertService();
   final FavoritesProvider _favoritesProvider = FavoritesProvider();
   final NotificationsProvider _notificationsProvider = NotificationsProvider();
   final SettingsService _settingsService = SettingsService();
@@ -76,6 +78,7 @@ class _BusAppState extends State<BusApp> with WidgetsBindingObserver {
     _wsService.dispose();
     _crowdsourcingService.dispose();
     _conductorService.dispose();
+    _alertService.dispose();
     super.dispose();
   }
 
@@ -102,6 +105,7 @@ class _BusAppState extends State<BusApp> with WidgetsBindingObserver {
         ChangeNotifierProvider<WebSocketService>.value(value: _wsService),
         ChangeNotifierProvider<CrowdsourcingService>.value(value: _crowdsourcingService),
         ChangeNotifierProvider<ConductorService>.value(value: _conductorService),
+        ChangeNotifierProvider<AlertService>.value(value: _alertService),
         // New providers
         ChangeNotifierProvider<FavoritesProvider>.value(value: _favoritesProvider),
         ChangeNotifierProvider<NotificationsProvider>.value(value: _notificationsProvider),
