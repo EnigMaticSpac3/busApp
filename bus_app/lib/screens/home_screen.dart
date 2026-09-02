@@ -15,25 +15,24 @@ import '../services/websocket_service.dart';
 import '../widgets/search_pill.dart';
 import '../widgets/bus_marker_widget.dart';
 import '../widgets/canal_vector_map.dart';
-import '../widgets/contribuir_fab.dart';
-
 import '../widgets/connection_banner.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_banner.dart';
 import '../widgets/route_badge.dart';
-import '../widgets/seleccionar_ruta_sheet.dart';
 import '../widgets/stop_detail_sheet.dart';
 import '../widgets/stop_marker.dart';
-import '../widgets/subida_bus_sheet.dart';
 import '../widgets/user_location_marker.dart';
+import '../widgets/status_chip.dart';
 import '../theme/export.dart';
+import '../theme/settings_service.dart';
 import 'profile_screen.dart';
 import 'ruta_detalle_screen.dart';
+import 'rutas_screen.dart';
 
-/// HomeScreen con patrón Citymapper: mapa vectorial a pantalla completa
-/// como fondo, DraggableScrollableSheet con contenido contextual y acciones
-/// integradas en el panel, FAB de reubicación con opacidad animada,
-/// y brújula visible al rotar el mapa.
+/// HomeScreen con patrón Citymapper V2: mapa vectorial a pantalla completa
+/// como fondo, DraggableScrollableSheet con contenido contextual state-driven
+/// (peek → half → search → detail), FAB de reubicación, brújula visible
+/// al rotar el mapa.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -49,51 +48,66 @@ class _HomeScreenState extends State<HomeScreen> {
   WebSocketService? _wsService;
   bool _initialized = false;
 
-  // ── Estado del mapa ──
+  // ── Sheet controller ──
+  final _sheetController = DraggableScrollableController();
+  double _sheetExtent = 0.26;
+  double _previousSheetSize = 0.26;
+
+  // ── Search state ──
+  final _searchFocusNode = FocusNode();
+  final _searchController = TextEditingController();
+  bool _searching = false;
+  bool _editingOrigin = false;
+  String _origin = 'Mi ubicación';
+  String _destination = '';
+  bool _hasSearched = false;
+
+  // ── Detail state ──
+  bool _detailOpen = false;
+  int _selectedRouteIndex = 0;
+
+  // ── Map state ──
   List<LatLng> _routePoints = [];
   List<BusSesion> _flota = [];
   LatLng? _posicionUsuario;
-
   Map<String, LatLng> _posicionesAnterioresBuses = {};
   bool _cargandoRuta = true;
-  String? _errorRuta;
-
   List<ParadaModel> _paradas = [];
   double _currentZoom = 15.0;
   Timer? _pollingTimer;
   StreamSubscription<Position>? _locationSubscription;
   bool _emptyBannerDismissed = false;
 
-  // ── Estado de rutas (pestaña Rutas) ──
+  // ── Routes ──
   List<RutaModel> _rutas = [];
-  bool _cargandoRutas = true;
-  String? _errorRutas;
-  Timer? _rutasPollingTimer;
 
-  // ── Navegación y sheet ──
-  int _selectedTab = 0;
-  final _sheetController = DraggableScrollableController();
-  double _sheetExtent = 0.26;
-
-  // ── Brújula ──
+  // ── Compass ──
   double _mapRotation = 0;
 
-  // ── Conexión ──
+  // ── Connection ──
   bool _isOffline = false;
+
+  // ── Context-aware sheet sizes (Transita V2 pattern) ──
+  /// Peek: solo muestra los 3 chips de estado (mínimo mapa visible).
+  static const _sheetPeekSize = 0.26;
+  /// Half: muestra la parada + lista de rutas (~45% pantalla).
+  static const _sheetHalfSize = 0.45;
+  /// Detail: itinerario de ruta (~55% pantalla).
+  static const _sheetDetailSize = 0.55;
+  /// Search: editor de origen/destino + resultados (~75% pantalla).
+  static const _sheetSearchSize = 0.75;
 
   // ── Lifecycle ──
 
   @override
   void initState() {
     super.initState();
-    // Services are read from Provider in didChangeDependencies
     _sheetController.addListener(_onSheetChanged);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Initialize services from Provider on first build
     if (!_initialized) {
       _initialized = true;
       _api = context.read<ApiService>();
@@ -107,7 +121,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _iniciarPolling();
       _iniciarUbicacion();
       _cargarRutas();
-      _mostrarSheetSiCorresponde();
       _loadEmptyBannerPreference();
     }
   }
@@ -115,7 +128,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _pollingTimer?.cancel();
-    _rutasPollingTimer?.cancel();
     _locationSubscription?.cancel();
     _crowdsourcing.removeListener(_onCrowdsourcingChange);
     _wsService?.removeListener(_onWsChange);
@@ -123,21 +135,29 @@ class _HomeScreenState extends State<HomeScreen> {
     _crowdsourcing.dispose();
     _sheetController.removeListener(_onSheetChanged);
     _sheetController.dispose();
+    _searchFocusNode.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   // ── Listeners ──
 
   void _onSheetChanged() {
-    if (!mounted) return;
-    final height = MediaQuery.of(context).size.height;
-    if (height <= 0) return;
-    // DraggableScrollableController.size is already a fraction of the
-    // viewport. Dividing it by the viewport height made the sheet state
-    // effectively zero and put floating controls in the wrong place.
-    final extent = _sheetController.size;
-    if ((extent - _sheetExtent).abs() > 0.005) {
-      setState(() => _sheetExtent = extent);
+    if (!mounted || !_sheetController.isAttached) return;
+    final size = _sheetController.size;
+    final ascending = size > _previousSheetSize;
+    _previousSheetSize = size;
+    if ((size - _sheetExtent).abs() > 0.005) {
+      setState(() => _sheetExtent = size);
+    }
+    // Close search when user drags below half
+    if (_searching && !ascending && size < _sheetHalfSize - 0.05 && mounted) {
+      _searchFocusNode.unfocus();
+      setState(() {
+        _searching = false;
+        _editingOrigin = false;
+        _searchController.clear();
+      });
     }
   }
 
@@ -187,41 +207,9 @@ class _HomeScreenState extends State<HomeScreen> {
         });
   }
 
-  // ── Crowdsourcing ──
-
-  Future<void> _mostrarSheetSiCorresponde() async {
-    // First-launch crowdsourcing prompt: skip for now (shown on demand)
-  }
-
-  Future<void> _seleccionarRutaYContinuar() async {
-    await SeleccionarRutaSheet.mostrar(
-      context,
-      onRutaSeleccionada: (ruta) async {
-        if (!mounted) return;
-        await SubidaBusSheet.mostrar(
-          context,
-          busId: null,
-          onConfirmado: (sessionId) {
-            _crowdsourcing.setRutaPoints(_routePoints);
-            _crowdsourcing.iniciar();
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _toggleContribucion() async {
-    if (_crowdsourcing.estaActivo) {
-      _crowdsourcing.detener();
-    } else {
-      await _seleccionarRutaYContinuar();
-    }
-  }
-
   // ── Datos ──
 
   Future<void> _loadEmptyBannerPreference() async {
-    // Defaults to not dismissed; banner shows until user dismisses
     if (mounted) setState(() => _emptyBannerDismissed = false);
   }
 
@@ -229,10 +217,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final response = await _api.fetchRuta();
     if (!mounted) return;
     if (response == null) {
-      setState(() {
-        _cargandoRuta = false;
-        _errorRuta = 'No se pudo cargar la ruta';
-      });
+      setState(() => _cargandoRuta = false);
       return;
     }
     setState(() {
@@ -272,21 +257,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _cargarRutas({bool soloActualizar = false}) async {
-    if (!soloActualizar) {
-      setState(() {
-        _cargandoRutas = true;
-        _errorRutas = null;
-      });
-    }
+  Future<void> _cargarRutas() async {
     final rutas = await _api.fetchRutas();
     if (!mounted) return;
     setState(() {
       _rutas = rutas;
-      if (!soloActualizar) _cargandoRutas = false;
-      if (_rutas.isEmpty && !soloActualizar) {
-        _errorRutas = 'No se pudieron cargar las rutas';
-      }
     });
   }
 
@@ -309,14 +284,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onMapEvent(MapEvent event) {
     final rotation = event.camera.rotation;
-    final shouldShowCompass = rotation.abs() > 5;
-    if (shouldShowCompass != _mapRotation.abs() > 5 || mounted) {
+    if (rotation.abs() > 5 != _mapRotation.abs() > 5 || mounted) {
       setState(() => _mapRotation = rotation);
     }
-    // Detectar cambio de zoom para paradas
     final newZoom = event.camera.zoom;
-    final zoomCambioSignificativo = (newZoom - _currentZoom).abs() >= 1;
-    if (zoomCambioSignificativo && mounted) {
+    if ((newZoom - _currentZoom).abs() >= 1 && mounted) {
       setState(() => _currentZoom = newZoom);
     }
   }
@@ -344,101 +316,168 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _abrirBusqueda() {
-    final controller = TextEditingController();
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final query = controller.text.trim().toLowerCase();
-            final paradas = _paradas
-                .where((p) => p.nombre.toLowerCase().contains(query))
-                .toList();
-            final rutas = _rutas
-                .where(
-                  (r) =>
-                      '${r.codigo} ${r.nombre}'.toLowerCase().contains(query),
-                )
-                .toList();
-            return SafeArea(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
-                  0,
-                  AppSpacing.lg,
-                  MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: controller,
-                      autofocus: true,
-                      onChanged: (_) => setSheetState(() {}),
-                      decoration: const InputDecoration(
-                        labelText: 'Buscar parada o ruta',
-                        prefixIcon: Icon(Icons.search_rounded),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    SizedBox(
-                      height: 280,
-                      child: ListView(
-                        children: [
-                          ...paradas.map(
-                            (parada) => ListTile(
-                              leading: const Icon(Icons.location_on_outlined),
-                              title: Text(parada.nombre),
-                              onTap: () {
-                                Navigator.pop(sheetContext);
-                                _centrarEn(parada.lat, parada.lon);
-                              },
-                            ),
-                          ),
-                          ...rutas.map(
-                            (ruta) => ListTile(
-                              leading: const Icon(
-                                Icons.directions_bus_outlined,
-                              ),
-                              title: Text(ruta.nombre),
-                              subtitle: Text(ruta.codigo),
-                              onTap: () {
-                                Navigator.pop(sheetContext);
-                                setState(() => _selectedTab = 1);
-                                _sheetController.animateTo(
-                                  0.45,
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeOut,
-                                );
-                              },
-                            ),
-                          ),
-                          if (paradas.isEmpty && rutas.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.all(AppSpacing.lg),
-                              child: Text('No encontramos resultados'),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    ).whenComplete(controller.dispose);
-  }
-
   int _parseMinutos(String eta) {
     final match = RegExp(r'(\d+)\s*min').firstMatch(eta);
     if (match != null) return int.parse(match.group(1)!);
     return eta.contains('Menos de 1 min') ? 0 : 999;
+  }
+
+  // ── Sheet state management ──
+
+  void _startSearch() {
+    setState(() {
+      _searching = true;
+      _detailOpen = false;
+      _editingOrigin = false;
+      _searchController.clear();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_sheetController.isAttached) {
+        _sheetController.animateTo(
+          _sheetSearchSize,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        );
+      }
+      if (mounted) _searchFocusNode.requestFocus();
+    });
+  }
+
+  void _exitSearch() {
+    _searchFocusNode.unfocus();
+    setState(() {
+      _searching = false;
+      _editingOrigin = false;
+      _searchController.clear();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_sheetController.isAttached) return;
+      _sheetController.animateTo(
+        _sheetHalfSize,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  void _selectOrigin(String label) {
+    _searchFocusNode.unfocus();
+    setState(() {
+      _origin = label;
+      _hasSearched = true;
+      _searching = false;
+      _editingOrigin = false;
+      _searchController.clear();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_sheetController.isAttached) return;
+      _sheetController.animateTo(
+        _sheetHalfSize,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  void _selectDestination(String label) {
+    _searchFocusNode.unfocus();
+    setState(() {
+      _destination = label;
+      _hasSearched = true;
+      _searching = false;
+      _editingOrigin = false;
+      _searchController.clear();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_sheetController.isAttached) return;
+      _sheetController.animateTo(
+        _sheetHalfSize,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  void _activateField({required bool origin}) {
+    setState(() {
+      _editingOrigin = origin;
+      _searchController.text = origin ? _origin : _destination;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _searchFocusNode.requestFocus();
+    });
+  }
+
+  void _openRouteDetail(int index) {
+    setState(() {
+      _selectedRouteIndex = index;
+      _detailOpen = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_sheetController.isAttached) return;
+      _sheetController.animateTo(
+        _sheetDetailSize,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  void _closeDetail() {
+    setState(() => _detailOpen = false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_sheetController.isAttached) return;
+      _sheetController.animateTo(
+        _sheetPeekSize,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  // ── Derived data ──
+
+  /// Agrupa la flota por rutaId y cruza con _rutas para obtener el código.
+  List<_RouteBuses> get _rutasConBuses {
+    final map = <String, _RouteBuses>{};
+    for (final ruta in _rutas) {
+      final busesEnRuta =
+          _flota.where((b) => b.rutaId == ruta.rutaId).toList();
+      final activos = busesEnRuta.where((b) => b.esActivo).length;
+      map[ruta.rutaId] = _RouteBuses(
+        ruta: ruta,
+        buses: busesEnRuta,
+        activos: activos,
+      );
+    }
+    // Also include flota buses that don't match a known route
+    final knownIds = _rutas.map((r) => r.rutaId).toSet();
+    final unknownBuses = _flota.where((b) => !knownIds.contains(b.rutaId)).toList();
+    if (unknownBuses.isNotEmpty) {
+      map['unknown'] = _RouteBuses(
+        ruta: null,
+        buses: unknownBuses,
+        activos: unknownBuses.where((b) => b.esActivo).length,
+      );
+    }
+    return map.values.toList()
+      ..sort((a, b) => b.activos.compareTo(a.activos));
+  }
+
+  /// Top 3 route codes with active buses for peek chips.
+  List<StatusChipData> get _peekChips {
+    final rutas = _rutasConBuses
+        .where((r) => r.ruta != null && r.activos > 0)
+        .take(3)
+        .toList();
+    return rutas.map((r) {
+      return StatusChipData(
+        route: r.ruta!.codigo,
+        busCount: r.activos,
+        level: StatusLevel.onTime,
+      );
+    }).toList();
   }
 
   // ──────────────────────────────────────────────────────────────
@@ -447,105 +486,129 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final livingTheme = context.watch<LivingTheme>();
-    final isDark = livingTheme.isDark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sheetBottom = MediaQuery.of(context).size.height * _sheetExtent;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          // ═══ Capa base: mapa vectorial a pantalla completa ═══
-          Positioned.fill(child: _buildMap(isDark)),
+    return PopScope(
+      canPop: !_searching && !_detailOpen && _sheetExtent < _sheetPeekSize + 0.01,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (_searching) {
+          _exitSearch();
+        } else if (_detailOpen) {
+          _closeDetail();
+        } else if (_sheetExtent > 0.21) {
+          if (_sheetController.isAttached) {
+            _sheetController.animateTo(
+              _sheetPeekSize,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutCubic,
+            );
+          }
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(
+          children: [
+            // ═══ Capa base: mapa vectorial a pantalla completa ═══
+            Positioned.fill(child: _buildMap(isDark)),
 
-          // ═══ Sheet deslizante con búsqueda y navegación contextual ═══
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: DraggableScrollableSheet(
-              controller: _sheetController,
-              initialChildSize: 0.26,
-              minChildSize: 0.20,
-              maxChildSize: 0.88,
-              expand: false,
-              snap: true,
-              snapSizes: const [0.26, 0.45, 0.75],
-              builder: (context, scrollController) =>
-                  _buildSheetPanel(scrollController, isDark),
-            ),
-          ),
-
-          // ═══ FABs flotantes (derecha, sobre el panel) ═══
-          Positioned(
-            right: AppSpacing.lg,
-            bottom: sheetBottom + AppSpacing.md,
-            child: _buildFABs(isDark),
-          ),
-
-          // ═══ Brújula (se muestra al rotar) ═══
-          if (_mapRotation.abs() > 5)
-            Positioned(
-              bottom: sheetBottom + AppSpacing.lg + 48,
-              right: AppSpacing.lg,
-              child: _buildCompassButton(isDark),
-            ),
-
-          // ═══ Banner offline ═══
-          if (_isOffline)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: ConnectionBanner(
-                lastUpdated: 'hace un momento',
-                isDark: isDark,
-                onRetry: () {
-                  _iniciarWebSocket();
-                  setState(() => _isOffline = false);
-                },
+            // ═══ Sheet deslizante con contenido contextual state-driven ═══
+            if (!_isOffline || true) // Always show sheet
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: _buildBottomSheet(isDark),
               ),
-            ),
 
-          // ═══ Banner de error crowdsourcing ═══
-          if (_crowdsourcing.estado == EstadoContribucion.fueraRuta)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: const ErrorBanner(
-                message: 'Dejaste de contribuir (saliste de la ruta)',
-              ),
-            ),
-
-          // ═══ Banner vacío ═══
-          if (_flota.isEmpty &&
-              !_cargandoRuta &&
-              !_emptyBannerDismissed &&
-              _sheetExtent < 0.25)
-            Positioned(
-              bottom: sheetBottom + AppSpacing.xxl,
-              left: AppSpacing.lg,
-              right: AppSpacing.lg,
-              child: Material(
-                elevation: 4,
-                borderRadius: BorderRadius.circular(AppRadius.medium),
-                color: isDark
-                    ? CanalColors.darkSurface
-                    : CanalColors.lightSurface,
-                surfaceTintColor: Colors.transparent,
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: EmptyState(
-                    icon: Icons.directions_bus_outlined,
-                    message:
-                        'No hay buses activos en este momento.\nSé el primero en contribuir.',
-                    onDismiss: () {
-                      setState(() => _emptyBannerDismissed = true);
-                    },
+            // ═══ FAB reubicar GPS ═══
+            if (_sheetExtent < 0.55)
+              Positioned(
+                right: AppSpacing.lg,
+                bottom: sheetBottom + AppSpacing.md + MediaQuery.of(context).viewPadding.bottom,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 200),
+                  opacity: _sheetExtent > 0.50 ? 0.0 : 1.0,
+                  child: IgnorePointer(
+                    ignoring: _sheetExtent > 0.50,
+                    child: _buildCenterFab(isDark),
                   ),
                 ),
               ),
-            ),
-        ],
+
+            // ═══ Brújula (se muestra al rotar) ═══
+            if (_sheetExtent < 0.55 && _mapRotation.abs() > 5)
+              Positioned(
+                right: AppSpacing.lg,
+                bottom: sheetBottom + AppSpacing.lg + 56 + 12 + MediaQuery.of(context).viewPadding.bottom,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 200),
+                  opacity: _sheetExtent > 0.50 ? 0.0 : 1.0,
+                  child: IgnorePointer(
+                    ignoring: _sheetExtent > 0.50,
+                    child: _buildCompassButton(isDark),
+                  ),
+                ),
+              ),
+
+            // ═══ Banner offline ═══
+            if (_isOffline)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: ConnectionBanner(
+                  lastUpdated: 'hace un momento',
+                  isDark: isDark,
+                  onRetry: () {
+                    _iniciarWebSocket();
+                    setState(() => _isOffline = false);
+                  },
+                ),
+              ),
+
+            // ═══ Banner de error crowdsourcing ═══
+            if (_crowdsourcing.estado == EstadoContribucion.fueraRuta)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: const ErrorBanner(
+                  message: 'Dejaste de contribuir (saliste de la ruta)',
+                ),
+              ),
+
+            // ═══ Banner vacío ═══
+            if (_flota.isEmpty &&
+                !_cargandoRuta &&
+                !_emptyBannerDismissed &&
+                _sheetExtent < 0.25)
+              Positioned(
+                bottom: sheetBottom + AppSpacing.xxl,
+                left: AppSpacing.lg,
+                right: AppSpacing.lg,
+                child: Material(
+                  elevation: 4,
+                  borderRadius: BorderRadius.circular(AppRadius.medium),
+                  color: isDark
+                      ? CanalColors.darkSurface
+                      : CanalColors.lightSurface,
+                  surfaceTintColor: Colors.transparent,
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: EmptyState(
+                      icon: Icons.directions_bus_outlined,
+                      message:
+                          'No hay buses activos en este momento.\nSé el primero en contribuir.',
+                      onDismiss: () {
+                        setState(() => _emptyBannerDismissed = true);
+                      },
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -556,10 +619,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildMap(bool isDark) {
     return IgnorePointer(
-      // El mapa es interactuable solo cuando el sheet está en peek
       ignoring: _sheetExtent > 0.45,
       child: GestureDetector(
-        // Al tocar el mapa, colapsar el sheet
         onTap: () {
           if (_sheetExtent > 0.15) {
             _sheetController.animateTo(
@@ -624,416 +685,250 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ──────────────────────────────────────────────────────────────
-  // DRAGGABLE SHEET
+  // DRAGGABLE SHEET — state-driven (Transita V2 pattern)
   // ──────────────────────────────────────────────────────────────
 
-  Widget _buildSheetPanel(ScrollController scrollController, bool isDark) {
-    final bgColor = isDark ? CanalColors.darkSurface : CanalColors.lightSurface;
+  Widget _buildBottomSheet(bool isDark) {
+    final surface = isDark ? CanalColors.darkSurface : CanalColors.lightSurface;
+    final textPrimary = isDark
+        ? CanalColors.darkTextPrimary
+        : CanalColors.lightTextPrimary;
+    final textSecondary = isDark
+        ? CanalColors.darkTextSecondary
+        : CanalColors.lightTextSecondary;
+    final textMuted = isDark
+        ? CanalColors.darkTextMuted
+        : CanalColors.lightTextMuted;
+    final divider = isDark ? CanalColors.darkBorder : CanalColors.lightBorder;
 
+    return DraggableScrollableSheet(
+      controller: _sheetController,
+      initialChildSize: _sheetPeekSize,
+      minChildSize: 0.20,
+      maxChildSize: 0.88,
+      expand: false,
+      snap: true,
+      snapSizes: const [_sheetPeekSize, _sheetHalfSize, _sheetDetailSize, 0.88],
+      builder: (_, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.14),
+                blurRadius: 28,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              // ── Handle de arrastre ──
+              _buildGrabber(isDark),
+
+              // ── Search trigger + profile/routes icons (when not searching/detail) ──
+              if (!_searching && !_detailOpen) _buildSheetSearchTrigger(isDark),
+
+              // ── Contenido contextual state-driven ──
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: EdgeInsets.zero,
+                  physics: const ClampingScrollPhysics(),
+                  children: [
+                    if (_searching)
+                      _buildSearchContent(
+                        isDark, textPrimary, textSecondary, textMuted, divider,
+                      )
+                    else if (_detailOpen)
+                      _buildDetailContent(
+                        isDark, surface, textPrimary, textSecondary, textMuted, divider,
+                      )
+                    else if (_sheetExtent < _sheetPeekSize + 0.04)
+                      _buildPeekContent(isDark, textPrimary, textSecondary)
+                    else
+                      _buildHalfContent(
+                        isDark, surface, textPrimary, textSecondary, textMuted, divider,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGrabber(bool isDark) {
     return Container(
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(AppRadius.xlarge),
+      padding: const EdgeInsets.only(top: 10, bottom: 6),
+      child: Center(
+        child: Container(
+          width: 40,
+          height: 4,
+          decoration: BoxDecoration(
+            color: isDark ? CanalColors.darkTextMuted : CanalColors.lightBorder,
+            borderRadius: BorderRadius.circular(4),
+          ),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // ── Handle de arrastre ──
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(
-                top: AppSpacing.sm,
-                bottom: AppSpacing.xs,
-              ),
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: isDark
-                    ? CanalColors.darkTextMuted
-                    : CanalColors.lightTextMuted,
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-              ),
-            ),
-          ),
-
-          // ── Búsqueda y accesos contextuales (patrón Transita V2) ──
-          _buildSheetSearchControls(isDark),
-
-          // ── Contenido contextual ──
-          Expanded(
-            child: ListView(
-              controller: scrollController,
-              padding: EdgeInsets.zero,
-              physics: const ClampingScrollPhysics(),
-              children: [_buildTabContent(isDark)],
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  Widget _buildTabContent(bool isDark) {
-    switch (_selectedTab) {
-      case 0:
-        return _buildMapTabContent(isDark);
-      case 1:
-        return _buildRutasTabContent(isDark);
-      case 2:
-        return _buildPerfilTabContent(isDark);
-      default:
-        return _buildMapTabContent(isDark);
-    }
-  }
+  // ── Sheet search trigger (SearchPill + routes icon + profile icon) ──
 
-  // ── Tab Mapa: contenido mínimo ──
-
-  Widget _buildMapTabContent(bool isDark) {
-    final textColor = isDark
-        ? CanalColors.darkTextPrimary
-        : CanalColors.lightTextPrimary;
-    final secondaryColor = isDark
-        ? CanalColors.darkTextSecondary
-        : CanalColors.lightTextSecondary;
-
+  Widget _buildSheetSearchTrigger(bool isDark) {
+    final alignment = context.watch<SettingsService>().searchAlignment;
+    final searchFlex = switch (alignment) {
+      SearchAlignment.left => 5,
+      SearchAlignment.center => 4,
+      SearchAlignment.right => 3,
+    };
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.md,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
+      child: Row(
         children: [
-          Text(
-            'Transita',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: textColor,
+          // ── Left side icons ──
+          if (alignment == SearchAlignment.center) ...[
+            _buildRoutesIcon(isDark),
+            const SizedBox(width: 8),
+          ],
+          if (alignment == SearchAlignment.right) ...[
+            _buildRoutesIcon(isDark),
+            const SizedBox(width: 4),
+            _buildProfileIcon(isDark),
+            const SizedBox(width: 8),
+          ],
+          // ── Search pill ──
+          Expanded(
+            flex: searchFlex,
+            child: SearchPill(
+              key: const Key('searchPill'),
+              isDark: isDark,
+              label: _hasSearched
+                  ? '$_origin → $_destination'
+                  : '¿A dónde vas?',
+              onTap: _startSearch,
+              onFilter: _startSearch,
             ),
           ),
-          const SizedBox(height: AppSpacing.xs),
-          if (_errorRuta != null)
-            Row(
-              children: [
-                Icon(Icons.wifi_off, size: 14, color: CanalColors.alert),
-                const SizedBox(width: AppSpacing.xs),
-                Expanded(
-                  child: Text(
-                    _errorRuta!,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: CanalColors.alert,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    setState(() => _errorRuta = null);
-                    _cargarRuta();
-                  },
-                  child: const Text(
-                    'Reintentar',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ),
-              ],
-            )
-          else ...[
-            Text(
-              _flota.isEmpty
-                  ? 'No hay buses activos'
-                  : '${_flota.length} buses en tiempo real',
-              style: TextStyle(fontSize: 13, color: secondaryColor),
-            ),
-            if (_wsService?.conectado == true) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Row(
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      color: CanalColors.liveGreen,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Text(
-                    'Conectado',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: CanalColors.liveGreen,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+          // ── Right side icons ──
+          if (alignment == SearchAlignment.center) ...[
+            const SizedBox(width: 8),
+            _buildProfileIcon(isDark),
+          ],
+          if (alignment == SearchAlignment.left) ...[
+            const SizedBox(width: 8),
+            _buildRoutesIcon(isDark),
+            const SizedBox(width: 4),
+            _buildProfileIcon(isDark),
           ],
         ],
       ),
     );
   }
 
-  // ── Tab Rutas: lista de rutas ──
-
-  Widget _buildRutasTabContent(bool isDark) {
-    if (_cargandoRutas) {
-      return const Padding(
-        padding: EdgeInsets.all(AppSpacing.xxl),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (_errorRutas != null) {
-      return Padding(
-        padding: const EdgeInsets.all(AppSpacing.xxl),
-        child: EmptyState(
-          icon: Icons.error_outline,
-          message: _errorRutas!,
-          actionLabel: 'Reintentar',
-          onAction: _cargarRutas,
+  Widget _buildProfileIcon(bool isDark) {
+    final iconColor = isDark ? CanalColors.darkTextMuted : CanalColors.lightTextMuted;
+    return Semantics(
+      key: const Key('profileIcon'),
+      button: true,
+      label: 'Perfil',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ProfileScreen()),
+          );
+        },
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          alignment: Alignment.center,
+          child: Icon(
+            Icons.person_outline_rounded,
+            size: 22,
+            color: iconColor,
+          ),
         ),
-      );
-    }
-
-    if (_rutas.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(AppSpacing.xxl),
-        child: EmptyState(
-          icon: Icons.directions_bus,
-          message: 'No hay rutas disponibles',
-        ),
-      );
-    }
-
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-      itemCount: _rutas.length,
-      itemBuilder: (context, index) => _buildRutaCard(_rutas[index], isDark),
+      ),
     );
   }
 
-  Widget _buildRutaCard(RutaModel ruta, bool isDark) {
-    final busesActivos = _flota
-        .where((b) => b.rutaId == ruta.rutaId && b.esActivo)
-        .length;
-    final tieneBuses = busesActivos > 0;
-    final secondaryColor = isDark
-        ? CanalColors.darkTextSecondary
-        : CanalColors.lightTextSecondary;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: InkWell(
+  Widget _buildRoutesIcon(bool isDark) {
+    final iconColor = isDark ? CanalColors.darkTextMuted : CanalColors.lightTextMuted;
+    return Semantics(
+      key: const Key('routesIcon'),
+      button: true,
+      label: 'Ver otras rutas',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: () {
-          Navigator.push(
-            context,
+          Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => RutaDetalleScreen(
-                ruta: ruta,
-                onCentrarEn: (lat, lon) => _centrarEn(lat, lon),
+              builder: (_) => RutasScreen(
+                onCentrarEn: (lat, lon, {double zoom = 16.0}) =>
+                    _centrarEn(lat, lon, zoom: zoom),
               ),
             ),
           );
         },
-        borderRadius: BorderRadius.circular(AppRadius.medium),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Row(
-            children: [
-              RouteBadge(codigo: ruta.codigo, fontSize: 16),
-              const SizedBox(width: AppSpacing.lg),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      ruta.nombre,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.directions_bus,
-                          size: 14,
-                          color: tieneBuses
-                              ? CanalColors.accent
-                              : secondaryColor,
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Text(
-                          '$busesActivos buses activos',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: tieneBuses
-                                ? CanalColors.accent
-                                : secondaryColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: secondaryColor),
-            ],
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          alignment: Alignment.center,
+          child: Icon(
+            Icons.alt_route_rounded,
+            size: 20,
+            color: iconColor,
           ),
         ),
       ),
     );
   }
 
-  // ── Tab Perfil: pantalla completa con ajustes y conductor ──
+  // ── FAB reubicar ──
 
-  Widget _buildPerfilTabContent(bool isDark) {
-    return const ProfileScreen();
-  }
-
-  // Search, routes and profile stay reachable without introducing a second
-  // persistent navigation surface. This mirrors the reference composition:
-  // the pill belongs to the draggable sheet, not to the map's top edge.
-  Widget _buildSheetSearchControls(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.xs,
-        AppSpacing.lg,
-        AppSpacing.sm,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: SearchPill(
-              key: const Key('searchPill'),
-              label: '¿A dónde vas?',
-              isDark: isDark,
-              onTap: _abrirBusqueda,
-              onFilter: _abrirBusqueda,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          _buildSheetAction(
-            icon: Icons.directions_bus_outlined,
-            label: 'Rutas',
-            isDark: isDark,
-            onPressed: () {
-              setState(() => _selectedTab = 1);
-              _sheetController.animateTo(
-                0.45,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOut,
-              );
-            },
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          _buildSheetAction(
-            icon: Icons.person_outline,
-            label: 'Perfil',
-            isDark: isDark,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ProfileScreen()),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSheetAction({
-    required IconData icon,
-    required String label,
-    required bool isDark,
-    required VoidCallback onPressed,
-  }) {
-    final color = isDark
-        ? CanalColors.darkTextSecondary
-        : CanalColors.lightTextSecondary;
+  Widget _buildCenterFab(bool isDark) {
     return Semantics(
+      key: const Key('centerFab'),
       button: true,
-      label: label,
-      child: IconButton(
-        tooltip: label,
-        onPressed: onPressed,
-        constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-        padding: EdgeInsets.zero,
-        icon: Icon(icon, size: 22, color: color),
+      label: 'Centrar en mi ubicación',
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        elevation: 0,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: _centrarEnUsuario,
+          child: Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isDark ? CanalColors.darkSurface : CanalColors.lightSurface,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.12),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.my_location_rounded,
+              size: 24,
+              color: isDark
+                  ? CanalColors.darkTextPrimary
+                  : CanalColors.primary,
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  // ──────────────────────────────────────────────────────────────
-  // FABs
-  // ──────────────────────────────────────────────────────────────
-
-  Widget _buildFABs(bool isDark) {
-    final activo = _crowdsourcing.estaActivo;
-    final ignorado = _crowdsourcing.estado == EstadoContribucion.ignorado;
-    final busId = _crowdsourcing.busAsignado;
-    final fabOpacity = _sheetExtent < 0.55 ? 1.0 : 0.0;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        // ── FAB reubicar GPS ──
-        AnimatedOpacity(
-          opacity: fabOpacity,
-          duration: const Duration(milliseconds: 200),
-          child: IgnorePointer(
-            ignoring: _sheetExtent >= 0.55,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: FloatingActionButton.small(
-                heroTag: 'recenter',
-                onPressed: _centrarEnUsuario,
-                backgroundColor: isDark
-                    ? CanalColors.darkSurface
-                    : CanalColors.lightSurface,
-                foregroundColor: isDark
-                    ? CanalColors.darkTextPrimary
-                    : CanalColors.lightTextPrimary,
-                elevation: 2,
-                child: const Icon(Icons.my_location),
-              ),
-            ),
-          ),
-        ),
-
-        // ── FAB contribuir ──
-        AnimatedOpacity(
-          opacity: fabOpacity,
-          duration: const Duration(milliseconds: 200),
-          child: IgnorePointer(
-            ignoring: _sheetExtent >= 0.55,
-            child: ContribuirFab(
-              activo: activo,
-              busId: busId,
-              ignorado: ignorado,
-              onPressed: _toggleContribucion,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ──────────────────────────────────────────────────────────────
-  // BRÚJULA
-  // ──────────────────────────────────────────────────────────────
+  // ── Compass button ──
 
   Widget _buildCompassButton(bool isDark) {
     return Material(
@@ -1047,18 +942,891 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         customBorder: const CircleBorder(),
         child: SizedBox(
-          width: 40,
-          height: 40,
+          width: 48,
+          height: 48,
           child: Transform.rotate(
             angle: _mapRotation * (3.14159 / 180),
-            child: const Icon(
-              Icons.navigation,
+            child: Icon(
+              Icons.explore,
+              size: 22,
               color: CanalColors.primary,
-              size: 24,
             ),
           ),
         ),
       ),
     );
   }
+
+  // ──────────────────────────────────────────────────────────────
+  // SHEET CONTENT: PEEK (StatusChips with real flota data)
+  // ──────────────────────────────────────────────────────────────
+
+  Widget _buildPeekContent(
+    bool isDark,
+    Color textPrimary,
+    Color textSecondary,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.directions_bus_rounded,
+                size: 14,
+                color: textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Próximos buses',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                  color: textSecondary,
+                ),
+              ),
+            ],
+          ),
+          if (_isOffline)
+            ConnectionBanner(
+              lastUpdated: 'hace un momento',
+              isDark: isDark,
+              onRetry: () {
+                _iniciarWebSocket();
+                setState(() => _isOffline = false);
+              },
+            ),
+          const SizedBox(height: 8),
+          if (!_isOffline)
+            _buildStatusChips(isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusChips(bool isDark) {
+    final chips = _peekChips;
+    if (chips.isEmpty) {
+      return Row(
+        children: [
+          Icon(Icons.info_outline, size: 14, color: CanalColors.darkTextMuted),
+          const SizedBox(width: 6),
+          Text(
+            _flota.isEmpty ? 'Sin buses en vivo' : 'Cargando rutas...',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 12,
+              color: CanalColors.darkTextMuted,
+            ),
+          ),
+        ],
+      );
+    }
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (int i = 0; i < chips.length; i++) ...[
+            if (i > 0) const SizedBox(width: 6),
+            StatusChip(
+              route: chips[i].route,
+              eta: '${chips[i].busCount} bus${chips[i].busCount > 1 ? 'es' : ''}',
+              level: chips[i].level,
+              isDark: isDark,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // SHEET CONTENT: HALF (Stop header + route cards list)
+  // ──────────────────────────────────────────────────────────────
+
+  Widget _buildHalfContent(
+    bool isDark,
+    Color surface,
+    Color textPrimary,
+    Color textSecondary,
+    Color textMuted,
+    Color divider,
+  ) {
+    final rutasConBuses = _rutasConBuses;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_isOffline) ...[
+            const SizedBox(height: 10),
+            ConnectionBanner(
+              lastUpdated: 'hace un momento',
+              isDark: isDark,
+              onRetry: () {
+                _iniciarWebSocket();
+                setState(() => _isOffline = false);
+              },
+            ),
+          ],
+          const SizedBox(height: 6),
+          // Parada actual: nombre + distancia/ubicación
+          _buildStopHeader(isDark, textPrimary, textSecondary),
+          const SizedBox(height: 18),
+          Text(
+            'Salen pronto',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.9,
+              color: textMuted,
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (rutasConBuses.isEmpty)
+            EmptyState(
+              icon: Icons.directions_bus_outlined,
+              message: _isOffline
+                  ? 'No hay rutas disponibles.\nRevisa tu red para ver buses en tiempo real.'
+                  : 'No hay buses disponibles ahora.',
+              actionLabel: _isOffline ? 'Reintentar' : 'Explorar el mapa',
+              onAction: _isOffline
+                  ? () {
+                      _iniciarWebSocket();
+                      setState(() => _isOffline = false);
+                    }
+                  : _centrarEnUsuario,
+            )
+          else
+            ...rutasConBuses.asMap().entries.map(
+              (e) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildRouteCard(e.value, isDark, surface, textPrimary, textSecondary, textMuted, divider),
+              ),
+            ),
+          // View all routes link
+          if (rutasConBuses.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Center(
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => RutasScreen(
+                        onCentrarEn: (lat, lon, {double zoom = 16.0}) =>
+                            _centrarEn(lat, lon, zoom: zoom),
+                      ),
+                    ),
+                  );
+                },
+                child: Text(
+                  'Ver todas las rutas',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: CanalColors.primary,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStopHeader(bool isDark, Color textPrimary, Color textSecondary) {
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: CanalColors.primary.withValues(
+              alpha: isDark ? 0.18 : 0.1,
+            ),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: CanalColors.primary.withValues(alpha: 0.35),
+            ),
+          ),
+          child: const Center(
+            child: Icon(
+              Icons.location_on_rounded,
+              size: 18,
+              color: CanalColors.primary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _paradas.isNotEmpty ? _paradas.first.nombre : 'Mi ubicación',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _posicionUsuario != null
+                    ? '${_flota.length} buses en tiempo real'
+                    : 'Obteniendo ubicación...',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  color: textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '${_rutas.length} rutas',
+          style: TextStyle(
+            fontFamily: 'JetBrains Mono',
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRouteCard(
+    _RouteBuses rb,
+    bool isDark,
+    Color surface,
+    Color textPrimary,
+    Color textSecondary,
+    Color textMuted,
+    Color divider,
+  ) {
+    if (rb.ruta == null) return const SizedBox.shrink();
+    final ruta = rb.ruta!;
+    final tieneBuses = rb.activos > 0;
+    final busLabel = rb.activos > 0
+        ? '${rb.activos} bus${rb.activos > 1 ? 'es' : ''} activo${rb.activos > 1 ? 's' : ''}'
+        : 'Sin buses';
+
+    return Semantics(
+      button: true,
+      label: 'Ruta ${ruta.codigo} a ${ruta.nombre}, $busLabel',
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            final index = _rutas.indexOf(ruta);
+            if (index >= 0) _openRouteDetail(index);
+          },
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: divider, width: 1),
+            ),
+            child: Row(
+              children: [
+                RouteBadge(codigo: ruta.codigo, fontSize: 14),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ruta.nombre,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.directions_bus,
+                            size: 14,
+                            color: tieneBuses
+                                ? CanalColors.accent
+                                : textSecondary,
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            busLabel,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: tieneBuses
+                                  ? CanalColors.accent
+                                  : textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, size: 18, color: textMuted),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // SHEET CONTENT: SEARCH (inline, not modal)
+  // ──────────────────────────────────────────────────────────────
+
+  Widget _buildSearchContent(
+    bool isDark,
+    Color textPrimary,
+    Color textSecondary,
+    Color textMuted,
+    Color divider,
+  ) {
+    final query = _searchController.text.trim().toLowerCase();
+    final stops = _paradas
+        .where((p) => p.nombre.toLowerCase().contains(query))
+        .toList();
+    final rutas = _rutas
+        .where(
+          (r) =>
+              '${r.codigo} ${r.nombre}'.toLowerCase().contains(query),
+        )
+        .toList();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: Semantics(
+              button: true,
+              label: 'Cancelar búsqueda',
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _exitSearch,
+                child: SizedBox(
+                  height: 44,
+                  child: Center(
+                    child: Text(
+                      'Cancelar',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: CanalColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Origin/Destination fields
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: divider),
+            ),
+            child: Column(
+              children: [
+                _buildSearchFieldRow(
+                  isOrigin: true,
+                  isActive: _editingOrigin,
+                  value: _origin,
+                  placeholder: '¿Desde dónde?',
+                  dotColor: textSecondary,
+                  isDark: isDark,
+                  textPrimary: textPrimary,
+                  textMuted: textMuted,
+                ),
+                Divider(height: 1, thickness: 1, color: divider),
+                _buildSearchFieldRow(
+                  isOrigin: false,
+                  isActive: !_editingOrigin,
+                  value: _destination,
+                  placeholder: '¿A dónde vas?',
+                  dotColor: CanalColors.primary,
+                  isDark: isDark,
+                  textPrimary: textPrimary,
+                  textMuted: textMuted,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Quick chips or filtered results
+          if (query.isEmpty) ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildSearchQuickChip(
+                  Icons.my_location_rounded,
+                  'Mi ubicación',
+                  isDark,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'RUTAS',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
+                color: textMuted,
+              ),
+            ),
+            const SizedBox(height: 4),
+            ..._rutas.map(
+              (r) => _buildSearchRouteRow(r, textPrimary, textMuted),
+            ),
+          ] else ...[
+            if (stops.isNotEmpty) ...[
+              Text(
+                'PARADAS',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: textMuted,
+                ),
+              ),
+              const SizedBox(height: 4),
+              ...stops.map(
+                (s) => _buildSearchStopRow(s, textPrimary, textMuted),
+              ),
+            ],
+            if (rutas.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'RUTAS',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: textMuted,
+                ),
+              ),
+              const SizedBox(height: 4),
+              ...rutas.map(
+                (r) => _buildSearchRouteRow(r, textPrimary, textMuted),
+              ),
+            ],
+            if (stops.isEmpty && rutas.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 32),
+                child: Center(
+                  child: Text(
+                    'Sin resultados para "$query"',
+                    style: TextStyle(fontSize: 14, color: textMuted),
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchFieldRow({
+    required bool isOrigin,
+    required bool isActive,
+    required String value,
+    required String placeholder,
+    required Color dotColor,
+    required bool isDark,
+    required Color textPrimary,
+    required Color textMuted,
+  }) {
+    return Material(
+      color: isActive
+          ? CanalColors.primary.withValues(alpha: isDark ? 0.08 : 0.05)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: isActive ? null : () => _activateField(origin: isOrigin),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 52),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: dotColor,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: isActive
+                    ? TextField(
+                        controller: _searchController,
+                        focusNode: _searchFocusNode,
+                        autofocus: true,
+                        onChanged: (_) => setState(() {}),
+                        style: TextStyle(fontSize: 15, color: textPrimary),
+                        decoration: InputDecoration(
+                          hintText: placeholder,
+                          hintStyle: TextStyle(color: textMuted),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 14,
+                          ),
+                        ),
+                      )
+                    : Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          value,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: textPrimary,
+                          ),
+                        ),
+                      ),
+              ),
+              if (!isActive)
+                Icon(Icons.chevron_right_rounded, size: 18, color: textMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchQuickChip(IconData icon, String label, bool isDark) {
+    return Material(
+      color: isDark
+          ? CanalColors.darkBackground
+          : CanalColors.primary.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(9999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(9999),
+        onTap: () {
+          _selectOrigin(label);
+        },
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: CanalColors.primary),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isDark
+                      ? CanalColors.darkTextPrimary
+                      : CanalColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchStopRow(
+    ParadaModel parada,
+    Color textPrimary,
+    Color textMuted,
+  ) {
+    return Semantics(
+      button: true,
+      label: parada.nombre,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          if (_editingOrigin) {
+            _selectOrigin(parada.nombre);
+          } else {
+            _selectDestination(parada.nombre);
+          }
+          _centrarEn(parada.lat, parada.lon);
+        },
+        child: SizedBox(
+          height: 44,
+          child: Row(
+            children: [
+              Icon(Icons.location_on_outlined, size: 16, color: textMuted),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  parada.nombre,
+                  style: TextStyle(fontSize: 14, color: textPrimary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchRouteRow(
+    RutaModel ruta,
+    Color textPrimary,
+    Color textMuted,
+  ) {
+    return Semantics(
+      button: true,
+      label: 'Ruta ${ruta.codigo} ${ruta.nombre}',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          if (_editingOrigin) {
+            _selectOrigin(ruta.nombre);
+          } else {
+            _selectDestination(ruta.nombre);
+          }
+        },
+        child: SizedBox(
+          height: 44,
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: CanalColors.primary,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  ruta.codigo,
+                  style: const TextStyle(
+                    fontFamily: 'JetBrains Mono',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  ruta.nombre,
+                  style: TextStyle(fontSize: 14, color: textPrimary),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, size: 18, color: textMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // SHEET CONTENT: DETAIL (route detail with stops)
+  // ──────────────────────────────────────────────────────────────
+
+  Widget _buildDetailContent(
+    bool isDark,
+    Color surface,
+    Color textPrimary,
+    Color textSecondary,
+    Color textMuted,
+    Color divider,
+  ) {
+    if (_selectedRouteIndex >= _rutas.length) return const SizedBox.shrink();
+    final ruta = _rutas[_selectedRouteIndex];
+    final busesEnRuta = _flota.where((b) => b.rutaId == ruta.rutaId).toList();
+    final activos = busesEnRuta.where((b) => b.esActivo).length;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Close button
+          Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _closeDetail,
+              child: SizedBox(
+                height: 48,
+                width: 48,
+                child: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 22,
+                  color: textMuted,
+                ),
+              ),
+            ),
+          ),
+          // Route header
+          Row(
+            children: [
+              RouteBadge(codigo: ruta.codigo, fontSize: 16),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      ruta.nombre,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$activos buses activos',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: activos > 0 ? CanalColors.accent : textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Navigate to full detail
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => RutaDetalleScreen(
+                      ruta: ruta,
+                      onCentrarEn: (lat, lon) => _centrarEn(lat, lon),
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.map_rounded, size: 18),
+              label: const Text(
+                'Ver en mapa',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: CanalColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ),
+          // Contribuir button (only in detail mode, like GO mode in Transita V2)
+          if (!_isOffline) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  // Trigger crowdsourcing for this route
+                  _crowdsourcing.setRutaPoints(_routePoints);
+                  _crowdsourcing.iniciar();
+                },
+                icon: Icon(
+                  Icons.location_on,
+                  size: 18,
+                  color: _crowdsourcing.estaActivo
+                      ? CanalColors.accent
+                      : CanalColors.primary,
+                ),
+                label: Text(
+                  _crowdsourcing.estaActivo
+                      ? 'Contribuyendo GPS'
+                      : 'Contribuir GPS',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _crowdsourcing.estaActivo
+                        ? CanalColors.accent
+                        : CanalColors.primary,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                    color: _crowdsourcing.estaActivo
+                        ? CanalColors.accent
+                        : CanalColors.primary,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Helper data class ──
+
+class _RouteBuses {
+  final RutaModel? ruta;
+  final List<BusSesion> buses;
+  final int activos;
+
+  const _RouteBuses({
+    required this.ruta,
+    required this.buses,
+    required this.activos,
+  });
+}
+
+class StatusChipData {
+  final String route;
+  final int busCount;
+  final StatusLevel level;
+
+  const StatusChipData({
+    required this.route,
+    required this.busCount,
+    required this.level,
+  });
 }
