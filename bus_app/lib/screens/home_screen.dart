@@ -12,6 +12,7 @@ import '../models/ruta_model.dart';
 import '../services/api_service.dart';
 import '../services/crowdsourcing_service.dart';
 import '../services/websocket_service.dart';
+import '../services/alert_service.dart';
 import '../widgets/search_pill.dart';
 import '../widgets/bus_marker_widget.dart';
 import '../widgets/canal_vector_map.dart';
@@ -23,9 +24,11 @@ import '../widgets/stop_detail_sheet.dart';
 import '../widgets/stop_marker.dart';
 import '../widgets/user_location_marker.dart';
 import '../widgets/status_chip.dart';
+import '../widgets/alert_banner.dart';
 import '../widgets/ad_banner.dart';
 import '../theme/export.dart';
 import '../theme/settings_service.dart';
+import 'alert_detail_screen.dart';
 import 'profile_screen.dart';
 import 'ruta_detalle_screen.dart';
 import 'rutas_screen.dart';
@@ -45,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // ── Servicios (via Provider) ──
   late final ApiService _api;
   late final CrowdsourcingService _crowdsourcing;
+  late final AlertService _alertService;
   final _mapController = MapController();
   WebSocketService? _wsService;
   bool _initialized = false;
@@ -113,11 +117,14 @@ class _HomeScreenState extends State<HomeScreen> {
       _initialized = true;
       _api = context.read<ApiService>();
       _crowdsourcing = context.read<CrowdsourcingService>();
+      _alertService = context.read<AlertService>();
       _wsService = context.read<WebSocketService>();
       _wsService!.addListener(_onWsChange);
       _crowdsourcing.addListener(_onCrowdsourcingChange);
+      _alertService.addListener(_onAlertChange);
 
       _iniciarWebSocket();
+      _iniciarAlertas();
       _cargarRuta();
       _iniciarPolling();
       _iniciarUbicacion();
@@ -131,6 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _pollingTimer?.cancel();
     _locationSubscription?.cancel();
     _crowdsourcing.removeListener(_onCrowdsourcingChange);
+    _alertService.removeListener(_onAlertChange);
     _wsService?.removeListener(_onWsChange);
     _wsService?.dispose();
     _crowdsourcing.dispose();
@@ -166,6 +174,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() {});
   }
 
+  void _onAlertChange() {
+    if (mounted) setState(() {});
+  }
+
   void _onWsChange() {
     if (mounted) {
       setState(() {
@@ -182,6 +194,18 @@ class _HomeScreenState extends State<HomeScreen> {
         .replaceAll('https://', 'wss://')
         .replaceAll('http://', 'ws://');
     _wsService!.conectar('$wsUrl/ws/flota');
+  }
+
+  // ── Alertas ──
+
+  void _iniciarAlertas() {
+    // Fetch initial alerts via HTTP
+    _alertService.fetchAlerts();
+    // Connect WebSocket for real-time alerts
+    final wsUrl = AppConfig.backendUrl
+        .replaceAll('https://', 'wss://')
+        .replaceAll('http://', 'ws://');
+    _alertService.connectWebSocket('$wsUrl/ws/alerts');
   }
 
   // ── Ubicación GPS ──
@@ -1000,6 +1024,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 setState(() => _isOffline = false);
               },
             ),
+          // ── Alert banners ──
+          ..._alertService.activeAlerts.take(3).map(
+            (alert) => AlertBanner(
+              alert: alert,
+              isDark: isDark,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AlertDetailScreen(alert: alert),
+                  ),
+                );
+              },
+              onDismiss: () {
+                // Dismiss handled by Dismissible in AlertBanner
+              },
+            ),
+          ),
           const SizedBox(height: 8),
           if (!_isOffline)
             _buildStatusChips(isDark),
