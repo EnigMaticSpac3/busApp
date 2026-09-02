@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/bus_sesion_model.dart';
+import '../utils/bus_dedup.dart';
 
 class WebSocketService extends ChangeNotifier {
   WebSocketChannel? _channel;
@@ -50,12 +51,11 @@ class WebSocketService extends ChangeNotifier {
     try {
       final data = jsonDecode(mensaje as String) as Map<String, dynamic>;
       if (data['tipo'] == 'flota') {
+        final lista = (data['datos'] as List)
+            .map((j) => BusSesion.fromJson(j as Map<String, dynamic>))
+            .toList();
         _flota.clear();
-        _flota.addAll(
-          (data['datos'] as List)
-              .map((j) => BusSesion.fromJson(j as Map<String, dynamic>))
-              .toList(),
-        );
+        _flota.addAll(deduplicateBuses(lista));
         notifyListeners();
       }
     } catch (e) {

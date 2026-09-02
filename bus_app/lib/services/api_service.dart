@@ -10,6 +10,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../config/app_config.dart';
 import '../models/bus_sesion_model.dart';
+import '../utils/bus_dedup.dart';
 import '../models/eta_model.dart';
 import '../models/eta_parada_response.dart';
 import '../models/parada_model.dart';
@@ -124,9 +125,10 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as List;
-        return data
+        final flota = data
             .map((json) => BusSesion.fromJson(json as Map<String, dynamic>))
             .toList();
+        return deduplicateBuses(flota);
       }
       debugPrint('fetchFlota: status ${response.statusCode}');
       return [];
