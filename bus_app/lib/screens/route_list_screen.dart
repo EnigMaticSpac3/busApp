@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/canal_colors.dart';
 import '../widgets/status_chip.dart';
+import '../widgets/ad_banner.dart';
 import '../widgets/route_card.dart' show RouteItem;
 import 'route_detail_v2_screen.dart';
 
@@ -425,6 +426,8 @@ class _RouteListScreenState extends State<RouteListScreen> {
       children: [
         ..._groups.map((g) => _buildCollapsibleGroup(g, isDark, textPrimary, textMuted, surface, border)),
         const SizedBox(height: 12),
+        AdBanner(isDark: isDark, placementId: 'route_list_bottom'),
+        const SizedBox(height: 16),
       ],
     );
   }

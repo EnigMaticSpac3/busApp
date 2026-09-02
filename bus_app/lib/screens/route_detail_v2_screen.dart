@@ -11,6 +11,7 @@ import '../widgets/route_card.dart';
 import '../widgets/status_chip.dart';
 import '../widgets/timetable_widget.dart';
 import '../widgets/sponsored_card.dart';
+import '../widgets/ad_banner.dart';
 
 /// Pantalla de detalle V2 — reemplaza `RouteDetailCitymapperScreen` (legacy).
 /// Usa `CanalVectorMap` (no OSM raster), la paleta Canal, y reutiliza
@@ -346,6 +347,9 @@ class _RouteDetailV2ScreenState extends State<RouteDetailV2Screen>
                   isDark: isDark,
                   onTap: () {},
                 ),
+                // Ad banner — bottom of trip detail
+                const SizedBox(height: 12),
+                AdBanner(isDark: isDark, placementId: 'trip_detail'),
               ],
             ),
           ),

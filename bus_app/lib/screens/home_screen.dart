@@ -23,6 +23,7 @@ import '../widgets/stop_detail_sheet.dart';
 import '../widgets/stop_marker.dart';
 import '../widgets/user_location_marker.dart';
 import '../widgets/status_chip.dart';
+import '../widgets/ad_banner.dart';
 import '../theme/export.dart';
 import '../theme/settings_service.dart';
 import 'profile_screen.dart';
@@ -1002,6 +1003,10 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 8),
           if (!_isOffline)
             _buildStatusChips(isDark),
+          if (!_isOffline) ...[
+            const SizedBox(height: 8),
+            AdBanner(isDark: isDark, placementId: 'home_peek'),
+          ],
         ],
       ),
     );
@@ -1799,6 +1804,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ],
+          // Ad banner — bottom of trip detail
+          const SizedBox(height: 12),
+          AdBanner(isDark: isDark, placementId: 'trip_detail'),
         ],
       ),
     );
