@@ -27,6 +27,14 @@ class RutaModel {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+    'ruta_id': rutaId,
+    'codigo': codigo,
+    'nombre': nombre,
+    'color': color,
+    'buses_activos': busesActivos,
+  };
+
   bool get tieneBusesActivos => busesActivos > 0;
 
   @override

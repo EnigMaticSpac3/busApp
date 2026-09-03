@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 import 'theme/export.dart';
 import 'theme/favorites_provider.dart';
@@ -15,6 +16,7 @@ import 'services/crowdsourcing_service.dart';
 import 'services/conductor_service.dart';
 import 'services/auth_service.dart';
 import 'services/alert_service.dart';
+import 'services/route_cache_service.dart';
 import 'providers/driver_credentials_provider.dart';
 import 'providers/gamification_provider.dart';
 import 'providers/driver_mode_provider.dart';
@@ -26,6 +28,7 @@ import 'screens/conductor_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
+  await Hive.initFlutter();
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
@@ -52,6 +55,7 @@ class _BusAppState extends State<BusApp> with WidgetsBindingObserver {
   final NotificationsProvider _notificationsProvider = NotificationsProvider();
   final SettingsService _settingsService = SettingsService();
   final OfflineProvider _offlineProvider = OfflineProvider();
+  final RouteCacheService _routeCacheService = RouteCacheService();
   late final DriverCredentialsProvider _driverCredentialsProvider;
   late final GamificationProvider _gamificationProvider;
   late final DriverModeProvider _driverModeProvider;
@@ -70,6 +74,7 @@ class _BusAppState extends State<BusApp> with WidgetsBindingObserver {
     // Initialize providers that load persisted state
     _driverCredentialsProvider.init();
     _gamificationProvider.init();
+    _routeCacheService.init();
   }
 
   @override
@@ -106,6 +111,8 @@ class _BusAppState extends State<BusApp> with WidgetsBindingObserver {
         ChangeNotifierProvider<CrowdsourcingService>.value(value: _crowdsourcingService),
         ChangeNotifierProvider<ConductorService>.value(value: _conductorService),
         ChangeNotifierProvider<AlertService>.value(value: _alertService),
+        // Offline-first route cache
+        Provider<RouteCacheService>.value(value: _routeCacheService),
         // New providers
         ChangeNotifierProvider<FavoritesProvider>.value(value: _favoritesProvider),
         ChangeNotifierProvider<NotificationsProvider>.value(value: _notificationsProvider),

@@ -6,7 +6,9 @@ import '../widgets/route_card.dart' show RouteItem;
 import 'route_detail_v2_screen.dart';
 
 class RouteListScreen extends StatefulWidget {
-  const RouteListScreen({super.key});
+  final Map<String, int>? activeBuses; // route_code → number of active buses
+
+  const RouteListScreen({super.key, this.activeBuses});
 
   @override
   State<RouteListScreen> createState() => _RouteListScreenState();
@@ -441,6 +443,7 @@ class _RouteListScreenState extends State<RouteListScreen> {
       surface: surface,
       border: border,
       onRouteTap: _navigateToDetail,
+      activeBuses: widget.activeBuses,
     );
   }
 
@@ -465,6 +468,7 @@ class _RouteListScreenState extends State<RouteListScreen> {
         textPrimary: textPrimary,
         textMuted: textMuted,
         border: border,
+        activeBuses: widget.activeBuses?[routes[i].code] ?? 0,
         onTap: () => _navigateToDetail(routes[i]),
       ),
     );
@@ -530,6 +534,7 @@ class _RouteTile extends StatelessWidget {
   final Color textMuted;
   final Color border;
   final VoidCallback onTap;
+  final int activeBuses;
 
   const _RouteTile({
     required this.route,
@@ -540,6 +545,7 @@ class _RouteTile extends StatelessWidget {
     required this.textMuted,
     required this.border,
     required this.onTap,
+    this.activeBuses = 0,
   });
 
   @override
@@ -576,6 +582,17 @@ class _RouteTile extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (activeBuses > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 4),
@@ -601,6 +618,7 @@ class _CollapsibleSection extends StatefulWidget {
   final Color surface;
   final Color border;
   final void Function(_RouteItem) onRouteTap;
+  final Map<String, int>? activeBuses;
 
   const _CollapsibleSection({
     required this.group,
@@ -610,6 +628,7 @@ class _CollapsibleSection extends StatefulWidget {
     required this.surface,
     required this.border,
     required this.onRouteTap,
+    this.activeBuses,
   });
 
   @override
@@ -697,6 +716,7 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
         textPrimary: textPrimary,
         textMuted: textMuted,
         border: border,
+        activeBuses: widget.activeBuses?[g.routes[i].code] ?? 0,
         onTap: () => widget.onRouteTap(g.routes[i]),
       ),
     );

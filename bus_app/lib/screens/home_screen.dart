@@ -30,8 +30,8 @@ import '../theme/export.dart';
 import '../theme/settings_service.dart';
 import 'alert_detail_screen.dart';
 import 'profile_screen.dart';
+import 'route_list_screen.dart';
 import 'ruta_detalle_screen.dart';
-import 'rutas_screen.dart';
 
 /// HomeScreen con patrón Citymapper V2: mapa vectorial a pantalla completa
 /// como fondo, DraggableScrollableSheet con contenido contextual state-driven
@@ -505,6 +505,24 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
+  /// Active buses per route code (for passing to RouteListScreen).
+  Map<String, int> get _activeBusesByRoute {
+    final map = <String, int>{};
+    for (final bus in _flota) {
+      if (bus.rutaId != null && bus.rutaId!.isNotEmpty) {
+        map[bus.rutaId!] = (map[bus.rutaId!] ?? 0) + 1;
+      }
+    }
+    // Convert rutaId → codigo using _rutas
+    final codeMap = <String, int>{};
+    for (final ruta in _rutas) {
+      if (map.containsKey(ruta.rutaId)) {
+        codeMap[ruta.codigo] = map[ruta.rutaId]!;
+      }
+    }
+    return codeMap;
+  }
+
   // ──────────────────────────────────────────────────────────────
   // BUILD
   // ──────────────────────────────────────────────────────────────
@@ -892,9 +910,8 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => RutasScreen(
-                onCentrarEn: (lat, lon, {double zoom = 16.0}) =>
-                    _centrarEn(lat, lon, zoom: zoom),
+              builder: (_) => RouteListScreen(
+                activeBuses: _activeBusesByRoute,
               ),
             ),
           );
@@ -1162,9 +1179,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => RutasScreen(
-                        onCentrarEn: (lat, lon, {double zoom = 16.0}) =>
-                            _centrarEn(lat, lon, zoom: zoom),
+                      builder: (_) => RouteListScreen(
+                        activeBuses: _activeBusesByRoute,
                       ),
                     ),
                   );
