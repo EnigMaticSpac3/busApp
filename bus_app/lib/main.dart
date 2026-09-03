@@ -9,6 +9,7 @@ import 'theme/favorites_provider.dart';
 import 'theme/notifications_provider.dart';
 import 'theme/settings_service.dart';
 import 'theme/offline_provider.dart';
+import 'services/connectivity_service.dart';
 import 'services/api_service.dart';
 import 'services/websocket_service.dart';
 import 'services/crowdsourcing_service.dart';
@@ -51,7 +52,8 @@ class _BusAppState extends State<BusApp> with WidgetsBindingObserver {
   final FavoritesProvider _favoritesProvider = FavoritesProvider();
   final NotificationsProvider _notificationsProvider = NotificationsProvider();
   final SettingsService _settingsService = SettingsService();
-  final OfflineProvider _offlineProvider = OfflineProvider();
+  final ConnectivityService _connectivityService = ConnectivityService();
+  late final OfflineProvider _offlineProvider;
   late final DriverCredentialsProvider _driverCredentialsProvider;
   late final GamificationProvider _gamificationProvider;
   late final DriverModeProvider _driverModeProvider;
@@ -63,11 +65,13 @@ class _BusAppState extends State<BusApp> with WidgetsBindingObserver {
     _updateThemeFromTime();
 
     // Adapter providers (wrap existing services)
+    _offlineProvider = OfflineProvider(_connectivityService);
     _driverCredentialsProvider = DriverCredentialsProvider(_authService);
     _gamificationProvider = GamificationProvider();
     _driverModeProvider = DriverModeProvider(_conductorService);
 
     // Initialize providers that load persisted state
+    _connectivityService.init();
     _driverCredentialsProvider.init();
     _gamificationProvider.init();
   }
@@ -79,6 +83,7 @@ class _BusAppState extends State<BusApp> with WidgetsBindingObserver {
     _crowdsourcingService.dispose();
     _conductorService.dispose();
     _alertService.dispose();
+    _connectivityService.dispose();
     super.dispose();
   }
 

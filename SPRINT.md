@@ -99,6 +99,64 @@ v5D ⬜  Deployment Fly.io — depende de v5A validado
 | T-19 | Deployment en Fly.io | @devops | ⬜ | v5A validado |
 | T-20 | Estandarizar IDs de rutas (SA_INTERNAL → E598) | @backend | ⬜ | T-19 |
 
+## 🎯 Sprint Offline-First — Arquitectura de Datos (PRIORIDAD ACTUAL)
+
+> Basado en research de Transit App, Flutter Offline-first docs, y Android Developers architecture.
+> Princípio: "La base de datos local es la fuente de verdad que consume la UI; la red sirve para sincronizarla."
+> Ref: FUTURE.md sección 7
+
+### Fase O1 — Fundación SQLite/Drift 🔴 (PRIMERO)
+
+| # | Ticket | Agente | Skills | Prioridad | Depende de | Descripción |
+|---|--------|--------|--------|-----------|------------|-------------|
+| T-32 | Setup Drift + modelo de datos offline | @frontend | flutter-working-with-databases, flutter-implement-json-serialization | 🔴 Crítica | ninguna | Agregar `drift` + `drift_dev` + `build_runner` a pubspec.yaml. Crear `lib/database/app_database.dart` con tablas: routes, stops, schedules, shapes. Crear DAOs básicos (RouteDao, StopDao). Schema Drift con migraciones. |
+| T-33 | RouteRepository offline-first | @frontend | flutter-working-with-databases, flutter-managing-state | 🔴 Crítica | T-32 | Crear `lib/repositories/route_repository.dart`. Implementar: getRoutes() → DB local → stale? → fetch API → update DB. Reemplazar consumo directo de ApiService en HomeScreen y RouteListScreen. |
+| T-34 | StopRepository offline-first | @frontend | flutter-working-with-databases, flutter-managing-state | 🔴 Crítica | T-32 | Crear `lib/repositories/stop_repository.dart`. Cache de paradas por ruta en DB local. Conectar a RouteDetailV2Screen y StopDetailScreen. |
+| T-35 | ScheduleRepository + timetable offline | @frontend | flutter-working-with-databases | 🟡 Alta | T-32 | Crear `lib/repositories/schedule_repository.dart`. Modelo de horarios en Drift. Conectar a TimetableScreen y RouteDetailV2Screen. Reemplazar datos demo hardcodeados con datos reales de DB. |
+
+### Fase O2 — Sync Engine 🟡
+
+| # | Ticket | Agente | Skills | Prioridad | Depende de | Descripción |
+|---|--------|--------|--------|-----------|------------|-------------|
+| T-36 | ConnectivityService real | @frontend | flutter-handling-http-and-json | 🟡 Alta | ninguna | Agregar `connectivity_plus` a pubspec.yaml. Reemplazar OfflineProvider (toggle manual) con detección real de red. Conectar a ConnectionBanner. |
+| T-37 | SyncEngine + freshness metadata | @frontend | flutter-working-with-databases, flutter-managing-state | 🟡 Alta | T-33, T-34, T-36 | Crear `lib/services/sync_engine.dart`. Trackear `downloaded_at`, `expires_at`, `version` por dataset. Implementar stale-while-revalidate: leer DB → si stale → fetch background → update DB → notify UI. |
+| T-38 | Background sync con workmanager | @frontend | flutter-working-with-databases | 🟡 Media | T-37 | Agregar `workmanager` a pubspec.yaml. Sync periódico cada 5 min en background. Condiciones: WiFi, batería > 20%. Prioridad: positions > alerts > routes/stops. |
+| T-39 | Offline indicator visual | @frontend | flutter-building-layouts | 🟢 Media | T-36 | Actualizar ConnectionBanner para mostrar: estado real de red + "Última actualización: hace X min" + indicador de freshness por dataset. |
+
+### Fase O3 — Backend Modularization 🔧
+
+| # | Ticket | Agente | Skills | Prioridad | Depende de | Descripción |
+|---|--------|--------|--------|-----------|------------|-------------|
+| T-40 | Completar split de backend en capas | @backend | fastapi-python | 🟡 Alta | ninguna | Mover lógica restante de main.py a services/, models/, routes/. Crear `providers/` directory con TransitProvider ABC. Crear `ws/` para WebSocket handlers. Crear `tasks/` para background tasks. |
+| T-41 | Agregar Redis para cache + PubSub | @backend | fastapi-python, devops-engineer | 🟡 Media | T-40 | Agregar `redis` a requirements.txt. Implementar Redis cache para rate limiting y reads. Redis PubSub para WebSocket broadcast (escalar a múltiples instancias). |
+| T-42 | Alembic migrations | @backend | fastapi-python | 🟢 Media | T-40 | Agregar `alembic` a requirements.txt. Crear migración inicial para tablas existentes. Setup para migraciones futuras. |
+
+### Fase O4 — Push Notifications (v5B) 🔔
+
+| # | Ticket | Agente | Skills | Prioridad | Depende de | Descripción |
+|---|--------|--------|--------|-----------|------------|-------------|
+| T-43 | Setup Firebase FCM en Flutter | @frontend | flutter-managing-state | 🟡 Alta | T-36 | Agregar `firebase_core` + `firebase_messaging` a pubspec.yaml. Configurar `firebase_options.dart`. Registrar tokens FCM. Crear handler de notificaciones en background. |
+| T-44 | Backend FCM sender | @backend | fastapi-python | 🟡 Alta | T-43 | Integrar `firebase-admin` en backend. Endpoint para enviar push a topics. Conectar AlertService a FCM: alert:new → push a topic `alerts_route_{id}`. |
+| T-45 | Notification preferences UI | @frontend | flutter-managing-state, flutter-building-layouts | 🟢 Media | T-43 | Pantalla de preferencias de notificación: suscripción por ruta, quiet hours, toggle global alerts. Conectar a NotificationsProvider. |
+
+### Fase O5 — Deployment 🚀
+
+| # | Ticket | Agente | Skills | Prioridad | Depende de | Descripción |
+|---|--------|--------|--------|-----------|------------|-------------|
+| T-46 | Fly.io deployment | @devops | devops-engineer | 🟡 Media | T-40 | Crear fly.toml. Configurar Dockerfile para Fly.io. Deploy backend. Variables de entorno (DATABASE_URL, REDIS_URL, FCM credentials). |
+| T-47 | GitHub Actions CI/CD | @devops | devops-engineer | 🟢 Media | T-46 | Crear `.github/workflows/ci.yml`. Lint + test en PR. Auto-deploy a Fly.io en push a master. |
+| T-48 | Estandarizar IDs de rutas | @backend | fastapi-python | 🟢 Baja | T-46 | Mapear SA_INTERNAL → E598 en todos los endpoints. |
+
+### Fase O6 — Features Avanzadas 🔮 (FUTURO)
+
+| # | Ticket | Agente | Skills | Prioridad | Depende de | Descripción |
+|---|--------|--------|--------|-----------|------------|-------------|
+| T-49 | User reports con outbox offline | @frontend + @backend | flutter-working-with-databases, fastapi-python | 🟢 Media | T-37 | Cola local de reportes (SQLite) → sync cuando haya conexión → POST /api/reports. Backend: endpoint + modelo UserReport. |
+| T-50 | GTFS Realtime consumer | @backend | fastapi-python | 🟢 Media | T-40 | Agregar `gtfs-realtime-bindings` + `protobuf`. Consumer de vehiclePositions.pb y tripUpdates.pb. Normalizar a modelos internos. |
+| T-51 | Provider abstraction (multi-provider) | @backend | fastapi-python | 🟢 Baja | T-50 | Implementar TransitProvider ABC. MiBusProvider, GTFSProvider. Normalization layer. |
+| T-52 | OTP integration | @devops + @backend | devops-engineer, fastapi-python | 🟢 Baja | T-46 | Configurar OpenTripPlanner con GTFS local + OSM Panamá. Endpoint FastAPI que consulta OTP. |
+| T-53 | Background location (Foreground Service) | @frontend | flutter-handling-http-and-json | 🟢 Baja | T-38 | Foreground Service para GPS continuo. Frecuencia variable según velocidad. |
+
 ---
 
 ## 📝 Historial de Cambios
