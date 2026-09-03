@@ -1,0 +1,45 @@
+Transita Backend — Alembic Migrations
+=====================================
+
+Database migration tool for the Transita backend.
+
+Quick Start
+-----------
+    # Apply all migrations to the database
+    alembic upgrade head
+
+    # Create a new migration (autogenerate from SQLAlchemy models)
+    alembic revision --autogenerate -m "description"
+
+    # Create an empty migration (manual)
+    alembic revision -m "description"
+
+    # View migration history
+    alembic history
+
+    # Check current migration version
+    alembic current
+
+    # Downgrade one step
+    alembic downgrade -1
+
+    # Downgrade to a specific revision
+    alembic downgrade <revision_id>
+
+Environment
+-----------
+DATABASE_URL is read from the environment. If not set, it falls back to
+individual env vars: DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME.
+
+Example:
+    DATABASE_URL=postgresql://admin:changeme@localhost:5432/san_antonio_db
+
+Adding SQLAlchemy Models
+------------------------
+1. Create your model in app/models/ (e.g., app/models/base.py)
+2. Import Base from your model in alembic/env.py:
+       from app.models.base import Base
+       target_metadata = Base.metadata
+3. Run: alembic revision --autogenerate -m "add table name"
+4. Review the generated migration in alembic/versions/
+5. Apply: alembic upgrade head
