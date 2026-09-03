@@ -1102,6 +1102,12 @@ class ProfileScreen extends StatelessWidget {
         ? CanalColors.darkTextSecondary
         : CanalColors.lightTextSecondary;
 
+    final isConnected = !offline.offline;
+    final lastConnected = offline.lastConnectedTime;
+    final lastConnectedText = lastConnected != null
+        ? 'Última conexión: ${_formatTimeAgo(lastConnected)}'
+        : 'Sin registro de conexión';
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1121,7 +1127,7 @@ class ProfileScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              offline.offline ? Icons.wifi_off_rounded : Icons.wifi_rounded,
+              isConnected ? Icons.wifi_rounded : Icons.wifi_off_rounded,
               size: 20,
               color: CanalColors.accent,
             ),
@@ -1132,7 +1138,7 @@ class ProfileScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Modo sin conexión',
+                  isConnected ? 'Conectado' : 'Sin conexión',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -1140,22 +1146,23 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  offline.offline
-                      ? 'Demo: mostrando datos offline'
-                      : 'Demo: datos en vivo',
+                  isConnected ? 'Datos en tiempo real' : lastConnectedText,
                   style: TextStyle(fontSize: 12, color: textSecondary),
                 ),
               ],
             ),
           ),
-          Switch(
-            value: offline.offline,
-            activeTrackColor: CanalColors.accent,
-            onChanged: (_) => offline.toggle(),
-          ),
         ],
       ),
     );
+  }
+
+  String _formatTimeAgo(DateTime dateTime) {
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.inMinutes < 1) return 'hace un momento';
+    if (diff.inMinutes < 60) return 'hace ${diff.inMinutes} min';
+    if (diff.inHours < 24) return 'hace ${diff.inHours}h';
+    return 'hace ${diff.inDays}d';
   }
 
   // ────────────────────────────────────────────────────────────────────

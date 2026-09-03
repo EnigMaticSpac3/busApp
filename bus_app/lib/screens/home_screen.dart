@@ -33,6 +33,7 @@ import 'profile_screen.dart';
 import 'route_list_screen.dart';
 import 'ruta_detalle_screen.dart';
 
+
 /// HomeScreen con patrón Citymapper V2: mapa vectorial a pantalla completa
 /// como fondo, DraggableScrollableSheet con contenido contextual state-driven
 /// (peek → half → search → detail), FAB de reubicación, brújula visible
@@ -568,7 +569,7 @@ class _HomeScreenState extends State<HomeScreen> {
             if (_sheetExtent < 0.55)
               Positioned(
                 right: AppSpacing.lg,
-                bottom: sheetBottom + AppSpacing.md + MediaQuery.of(context).viewPadding.bottom,
+                bottom: sheetBottom + AppSpacing.xs + MediaQuery.of(context).viewPadding.bottom,
                 child: AnimatedOpacity(
                   duration: const Duration(milliseconds: 200),
                   opacity: _sheetExtent > 0.50 ? 0.0 : 1.0,
@@ -583,7 +584,7 @@ class _HomeScreenState extends State<HomeScreen> {
             if (_sheetExtent < 0.55 && _mapRotation.abs() > 5)
               Positioned(
                 right: AppSpacing.lg,
-                bottom: sheetBottom + AppSpacing.lg + 56 + 12 + MediaQuery.of(context).viewPadding.bottom,
+                bottom: sheetBottom + AppSpacing.sm + 56 + 12 + MediaQuery.of(context).viewPadding.bottom,
                 child: AnimatedOpacity(
                   duration: const Duration(milliseconds: 200),
                   opacity: _sheetExtent > 0.50 ? 0.0 : 1.0,
