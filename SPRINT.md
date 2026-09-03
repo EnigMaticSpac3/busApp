@@ -8,7 +8,7 @@ v1  ✅  Mapa básico, ruta E598, simulación GPS
 v2  ✅  Sesiones dinámicas, crowdsourcing, validado en campo
 v3  ✅  Menú de rutas, ubicación usuario, navegación tabs
 v4  ✅  WebSocket, animaciones suaves, modo conductor básico
-v5A 🔄  Modo conductor: ~85% funcional (SPRINT EN REVISIÓN)
+v5A ✅  Modo conductor funcional + offline-first infrastructure
 v5B ⬜  Notificaciones push (FCM) — depende de v5A
 v5C ⬜  Planificador OTP — depende de v5B
 v5D ⬜  Deployment Fly.io — depende de v5A validado
@@ -22,7 +22,7 @@ v5D ⬜  Deployment Fly.io — depende de v5A validado
 |----|-------------|--------|---------|----------|
 | DT-01 | Dos paletas compitiendo: AppColors (#283C90) vs AppConfig (#0256a4) | @frontend | ~~ALTO~~ | ✅ Resuelto. AppColors es la única fuente. |
 | DT-02 | 6 archivos legacy sin uso: bus_marker.dart, bus_marker_animated.dart, eta_banner.dart, eta_badge.dart, bus_model.dart, conductor_service.dart | @frontend | ~~MEDIO~~ | ❌ **No eliminar.** Ya actualizados a AppColors. Pueden ser útiles como respaldo. Marcar como "disponibles" no como "basura". |
-| DT-03 | Backend monolítico: todo en main.py sin separación de capas | @backend | MEDIO | ⬜ Pendiente |
+| DT-03 | Backend monolítico: todo en main.py sin separación de capas | @backend | ~~MEDIO~~ | ✅ Resuelto. Backend modularizado: core/, models/, routes/, services/, providers/, ws/, tasks/. main.py 72 líneas. |
 | DT-04 | /api/rutas/{ruta_id}/paradas ignora el ruta_id (hardcoded) | @backend | ~~MEDIO~~ | ✅ Resuelto. Ahora filtra paradas por ruta_id real desde GTFS. Rama: `fix/backend-corregir-paradas-por-ruta`. |
 | DT-05 | Sin state management: todo setState, ~15 vars por screen | @frontend | BAJO | 🟡 Baja prioridad. Aplazar. |
 | DT-06 | Lógica GPS duplicada en conductor_service.dart y conductor_screen.dart | @frontend | ~~ALTO~~ | 🟡 Baja prioridad. `conductor_service.dart` no interfiere. Unificar solo si se refactoriza. |
@@ -109,26 +109,26 @@ v5D ⬜  Deployment Fly.io — depende de v5A validado
 
 | # | Ticket | Agente | Skills | Prioridad | Depende de | Descripción |
 |---|--------|--------|--------|-----------|------------|-------------|
-| T-32 | Setup Drift + modelo de datos offline | @frontend | flutter-working-with-databases, flutter-implement-json-serialization | 🔴 Crítica | ninguna | Agregar `drift` + `drift_dev` + `build_runner` a pubspec.yaml. Crear `lib/database/app_database.dart` con tablas: routes, stops, schedules, shapes. Crear DAOs básicos (RouteDao, StopDao). Schema Drift con migraciones. |
-| T-33 | RouteRepository offline-first | @frontend | flutter-working-with-databases, flutter-managing-state | 🔴 Crítica | T-32 | Crear `lib/repositories/route_repository.dart`. Implementar: getRoutes() → DB local → stale? → fetch API → update DB. Reemplazar consumo directo de ApiService en HomeScreen y RouteListScreen. |
-| T-34 | StopRepository offline-first | @frontend | flutter-working-with-databases, flutter-managing-state | 🔴 Crítica | T-32 | Crear `lib/repositories/stop_repository.dart`. Cache de paradas por ruta en DB local. Conectar a RouteDetailV2Screen y StopDetailScreen. |
-| T-35 | ScheduleRepository + timetable offline | @frontend | flutter-working-with-databases | 🟡 Alta | T-32 | Crear `lib/repositories/schedule_repository.dart`. Modelo de horarios en Drift. Conectar a TimetableScreen y RouteDetailV2Screen. Reemplazar datos demo hardcodeados con datos reales de DB. |
+| T-32 | Setup Drift + modelo de datos offline | @frontend | flutter-working-with-databases, flutter-implement-json-serialization | 🔴 Crítica | ninguna | ✅ Resuelto. Drift + 4 tablas (routes, stops, schedules, sync_metadata) + DAOs + code generation. |
+| T-33 | RouteRepository offline-first | @frontend | flutter-working-with-databases, flutter-managing-state | 🔴 Crítica | T-32 | ✅ Resuelto. RouteRepository con Stream + stale-while-revalidate. |
+| T-34 | StopRepository offline-first | @frontend | flutter-working-with-databases, flutter-managing-state | 🔴 Crítica | T-32 | ✅ Resuelto. StopRepository con cache por ruta. |
+| T-35 | ScheduleRepository + timetable offline | @frontend | flutter-working-with-databases | 🟡 Alta | T-32 | ✅ Resuelto. ScheduleRepository + demo seeder + DepartureEntry mapping. |
 
 ### Fase O2 — Sync Engine 🟡
 
 | # | Ticket | Agente | Skills | Prioridad | Depende de | Descripción |
 |---|--------|--------|--------|-----------|------------|-------------|
-| T-36 | ConnectivityService real | @frontend | flutter-handling-http-and-json | 🟡 Alta | ninguna | Agregar `connectivity_plus` a pubspec.yaml. Reemplazar OfflineProvider (toggle manual) con detección real de red. Conectar a ConnectionBanner. |
+| T-36 | ConnectivityService real | @frontend | flutter-handling-http-and-json | 🟡 Alta | ninguna | ✅ Resuelto. ConnectivityService real con connectivity_plus. |
 | T-37 | SyncEngine + freshness metadata | @frontend | flutter-working-with-databases, flutter-managing-state | 🟡 Alta | T-33, T-34, T-36 | Crear `lib/services/sync_engine.dart`. Trackear `downloaded_at`, `expires_at`, `version` por dataset. Implementar stale-while-revalidate: leer DB → si stale → fetch background → update DB → notify UI. |
 | T-38 | Background sync con workmanager | @frontend | flutter-working-with-databases | 🟡 Media | T-37 | Agregar `workmanager` a pubspec.yaml. Sync periódico cada 5 min en background. Condiciones: WiFi, batería > 20%. Prioridad: positions > alerts > routes/stops. |
-| T-39 | Offline indicator visual | @frontend | flutter-building-layouts | 🟢 Media | T-36 | Actualizar ConnectionBanner para mostrar: estado real de red + "Última actualización: hace X min" + indicador de freshness por dataset. |
+| T-39 | Offline indicator visual | @frontend | flutter-building-layouts | 🟢 Media | T-36 | ✅ Resuelto. ConnectionBanner 3-estado (offline/stale/fresh). |
 
 ### Fase O3 — Backend Modularization 🔧
 
 | # | Ticket | Agente | Skills | Prioridad | Depende de | Descripción |
 |---|--------|--------|--------|-----------|------------|-------------|
-| T-40 | Completar split de backend en capas | @backend | fastapi-python | 🟡 Alta | ninguna | Mover lógica restante de main.py a services/, models/, routes/. Crear `providers/` directory con TransitProvider ABC. Crear `ws/` para WebSocket handlers. Crear `tasks/` para background tasks. |
-| T-41 | Agregar Redis para cache + PubSub | @backend | fastapi-python, devops-engineer | 🟡 Media | T-40 | Agregar `redis` a requirements.txt. Implementar Redis cache para rate limiting y reads. Redis PubSub para WebSocket broadcast (escalar a múltiples instancias). |
+| T-40 | Completar split de backend en capas | @backend | fastapi-python | 🟡 Alta | ninguna | ✅ Resuelto. Backend split completo, main.py 72 líneas. |
+| T-41 | Agregar Redis para cache + PubSub | @backend | fastapi-python, devops-engineer | 🟡 Media | T-40 | ✅ Resuelto. Redis cache + PubSub + graceful fallback. |
 | T-42 | Alembic migrations | @backend | fastapi-python | 🟢 Media | T-40 | Agregar `alembic` a requirements.txt. Crear migración inicial para tablas existentes. Setup para migraciones futuras. |
 
 ### Fase O4 — Push Notifications (v5B) 🔔
@@ -176,6 +176,17 @@ v5D ⬜  Deployment Fly.io — depende de v5A validado
 | 2026-07 | T-29 completado: ETA real al tocar parada en mapa + eliminado CollapsedEtaCard | Orquestador |
 | 2026-07 | T-31 creado: rebranding a Transita con paleta Canal | Orquestador |
 | 2026-07 | T-31 completado: rebranding a Transita con paleta Canal | Orquestador |
+| 2026-09 | T-32 completado: Drift setup + 4 tablas + DAOs + code generation | Orquestador |
+| 2026-09 | T-33 completado: RouteRepository offline-first | Orquestador |
+| 2026-09 | T-34 completado: StopRepository offline-first | Orquestador |
+| 2026-09 | T-35 completado: ScheduleRepository + demo seeder | Orquestador |
+| 2026-09 | T-36 completado: ConnectivityService real | Orquestador |
+| 2026-09 | T-39 completado: ConnectionBanner 3-estado | Orquestador |
+| 2026-09 | T-40 completado: Backend modularization (main.py 72 líneas) | Orquestador |
+| 2026-09 | T-41 completado: Redis cache + PubSub | Orquestador |
+| 2026-09 | T-42 completado: Alembic migrations | Orquestador |
+| 2026-09 | Fix visual: botón ubicación más cerca del bottom sheet | Orquestador |
+| 2026-09 | Merge ramas a master, limpieza de branches | Jorge |
 
 ---
 
